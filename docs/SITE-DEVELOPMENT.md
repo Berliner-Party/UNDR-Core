@@ -45,9 +45,11 @@ sync shows a graceful "coming soon" state, never an error.
 
 ## 2. First-time local setup
 
-Prerequisites: **PHP 8.1+** and **Composer**. For local dev you also need the
-sibling **`UNDR Core`** checkout next to this repo (the `composer.json` references it
-as a `path` repository at `../UNDR Core`).
+Prerequisites: **PHP 8.1+** and **Composer**. `undr/core` is pulled from the GitHub
+VCS repo (`Berliner-Party/UNDR-Core`, tracked as `dev-main`) — **not** a local path.
+With `preferred-install: source` Composer git-clones it into `vendor/undr/core` as a
+real working checkout. A **private** Core repo needs Composer GitHub auth first:
+`composer config --global github-oauth.github.com <token>` (or an SSH deploy key).
 
 ```bash
 composer install                 # pulls undr/core + runs the asset publish step
@@ -189,13 +191,16 @@ picks up published changes on the next `bin/sync.php` run. Locally, run `php bin
 ## 8. Updating `undr/core`
 
 ```bash
-composer update undr/core      # re-fetch + re-run the publish step
+composer update undr/core      # re-fetch dev-main + re-run the publish step
 ```
 
-In **dev** the package is the local `../UNDR Core` path repo (instant — your edits there are
-live after `composer update`, or immediately via the symlink for PHP; re-run publish for assets:
-`php vendor/undr/core/scaffold/publish.php`). In **prod** it's the GitHub VCS repo pinned to a
-SemVer tag (`"undr/core": "^1.0"`); bump the tag in `UNDR Core`, then `composer update` here.
+`undr/core` always comes from the GitHub VCS repo (every site uses
+`{"type":"vcs","url":"…/UNDR-Core.git","no-api":true}` + `"undr/core":"dev-main"`). To change
+Core: edit it in `vendor/undr/core` (it's a real git clone thanks to `preferred-install: source`)
+or in a standalone `UNDR-Core` checkout, commit + **push to `main`**, then `composer update undr/core`
+in each site to pull it. For pinned releases, push a SemVer tag in UNDR-Core and switch the
+constraint to `"^1.0"`. Re-run the asset publish manually if needed:
+`php vendor/undr/core/scaffold/publish.php`.
 
 ---
 
@@ -235,7 +240,7 @@ and the published `undr-*` assets are gitignored and rebuilt by the hook.
 |---|---|
 | German page renders in English | A template reads `$GLOBALS['<BRAND>_CATALOG']` directly → use `Catalog::raw()` / `t()`. |
 | No styling after deploy | The publish step didn't run → `composer install` (or the post-merge hook is missing). |
-| `composer` can't resolve `undr/core` | A `path` repo reached prod → switch `composer.json` to the GitHub **VCS** repo + tag. |
+| `composer` can't clone `undr/core` | UNDR-Core not pushed/reachable, or missing GitHub auth for the private repo → push it + `composer config --global github-oauth.github.com <token>`. |
 | Modal won't open | Check `window.UNDR_MODAL` is set before the scripts, and the markup ids/source match §6. |
 | `Fatal: Cannot redeclare h()` | A local lib still defines a Core helper AND Core loaded it → remove the local copy (or guard it). |
 | Sync logs `degraded=1` | API unreachable — expected to keep serving cache (exit 0). Investigate if persistent. |
@@ -248,4 +253,4 @@ and the published `undr-*` assets are gitignored and rebuilt by the hook.
 - **Preserve brand parity.** Don't merge `build_event_jsonld`/ticket-link/.ics across brands — they differ on purpose.
 - After any change, **run `php -S` and verify** (golden HTML/JSON-LD diff + a Playwright console check) before claiming done.
 - Don't commit `vendor/`, `.cache/`, `public/media/`, or the published `undr-*` assets — all gitignored.
-- The `path` Composer repo is dev-only; never let it reach a production commit destined for deploy.
+- `undr/core` is consumed from the GitHub **VCS** repo (`dev-main`) on every site — never reintroduce a local `path` repository. Edit Core in `vendor/undr/core` (a real clone) or a standalone UNDR-Core checkout, then push + `composer update`.

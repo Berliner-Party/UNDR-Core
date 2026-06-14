@@ -67,10 +67,10 @@ The site renders nothing until the API serves the brand. Using the UNDR MCP tool
     "type": "project",
     "require": {
         "php": ">=8.1",
-        "undr/core": "@dev"
+        "undr/core": "dev-main"
     },
     "repositories": [
-        { "type": "path", "url": "../UNDR Core" }
+        { "type": "vcs", "url": "https://github.com/Berliner-Party/UNDR-Core.git", "no-api": true }
     ],
     "autoload": {
         "files": ["public/lib/events.brand.php"]
@@ -81,17 +81,23 @@ The site renders nothing until the API serves the brand. Using the UNDR MCP tool
     },
     "minimum-stability": "dev",
     "prefer-stable": true,
-    "config": { "optimize-autoloader": true }
+    "config": {
+        "optimize-autoloader": true,
+        "github-protocols": ["https"],
+        "preferred-install": { "undr/core": "source" }
+    }
 }
 ```
 
-**Before the first production deploy**, replace the `path` repository with the GitHub VCS repo
-and pin a tag:
-```json
-"require": { "php": ">=8.1", "undr/core": "^1.0" },
-"repositories": [{ "type": "vcs", "url": "https://github.com/Berliner-Party/UNDR-Core.git" }],
-```
-(then `composer update undr/core`).
+**All sites pull `undr/core` from the GitHub VCS repo — never a local path.**
+- `"undr/core": "dev-main"` tracks the Core repo's `main` branch. For a pinned release instead,
+  push a SemVer tag in UNDR-Core and use `"^1.0"`.
+- `"no-api": true` + `"preferred-install": {"undr/core":"source"}` make Composer **git-clone**
+  the repo into `vendor/undr/core` as a real working checkout (no GitHub zip API). That avoids
+  API rate limits/token-for-API and lets you edit/commit/push Core straight from `vendor/undr/core`.
+- A **private** UNDR-Core repo needs Composer GitHub auth on every machine/server that installs
+  (`composer config --global github-oauth.github.com <token>`, or an SSH deploy key).
+- `composer install`/`update` only work once UNDR-Core exists on GitHub and is reachable.
 
 ---
 
