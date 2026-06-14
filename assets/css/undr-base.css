@@ -1,0 +1,80 @@
+/* =========================================================================
+   UNDR Core — shared base stylesheet.
+
+   Linked FIRST on every UNDR site, BEFORE the brand sheet:
+     <link rel="stylesheet" href="/assets/undr-base.css?v=…">
+     <link rel="stylesheet" href="/assets/heat.css?v=…">
+
+   Holds the canonical --undr-* design-token CONTRACT plus the handful of
+   genuinely brand-neutral primitives every site shares verbatim. Each brand
+   sheet loads after this and (a) supplies the token VALUES for its palette,
+   fonts and scale, and (b) keeps its brand-specific components.
+
+   NOTE: the structural component CSS (.modal, .event-detail, .ev-*, .upcoming,
+   .hero) is intentionally NOT here — each brand has woven its aesthetic
+   (thermal gradients / monochrome / chrome) directly into those rule bodies,
+   so they are not byte-identical and live in the per-brand sheet. The token
+   contract below is what keeps a NEW brand consistent from day one and is the
+   seam through which those components can be converged later (with visual
+   regression testing).
+   ========================================================================= */
+
+:root {
+  /* ---- Surfaces / ink (brands override) ---- */
+  --undr-bg:          #000;
+  --undr-bg-tint:     #0a0a0a;
+  --undr-surface-1:   #111;
+  --undr-surface-2:   #1a1a1a;
+  --undr-ink:         #ffffff;
+  --undr-ink-mid:     rgba(255, 255, 255, 0.72);
+  --undr-ink-faint:   rgba(255, 255, 255, 0.5);
+  --undr-rule:        rgba(255, 255, 255, 0.10);
+  --undr-rule-2:      rgba(255, 255, 255, 0.22);
+
+  /* ---- Accent (brand colour) ---- */
+  --undr-accent:      #ff6b2e;
+  --undr-accent-hot:  #ffa557;
+  --undr-accent-soft: rgba(255, 107, 46, 0.16);
+  --undr-live:        #ff2d9b;
+
+  /* ---- Type families ---- */
+  --undr-font-display: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --undr-font-sans:    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --undr-font-mono:    ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ---- Type scale ---- */
+  --undr-fs-xs:   0.72rem;
+  --undr-fs-sm:   0.85rem;
+  --undr-fs-md:   1rem;
+  --undr-fs-lg:   1.25rem;
+  --undr-fs-xl:   1.6rem;
+  --undr-fs-2xl:  2rem;
+  --undr-fs-hero: clamp(2.5rem, 8vw, 5rem);
+
+  /* ---- Rhythm / layout ---- */
+  --undr-gutter:    clamp(1.2rem, 4vw, 2rem);
+  --undr-max-w:     720px;
+  --undr-prose-w:   70ch;
+  --undr-radius:    0px;
+  --undr-section-y: clamp(56px, 9vw, 120px);
+
+  /* ---- Motion / focus ---- */
+  --undr-ease:   cubic-bezier(.2, .8, .2, 1);
+  --undr-t-fast: 140ms;
+  --undr-t-base: 200ms;
+  --undr-focus:  0 0 0 2px var(--undr-bg), 0 0 0 4px var(--undr-accent);
+}
+
+/* ---- Screen-reader-only, exposed to assistive tech (WCAG 1.3.1). Byte-identical
+   across all UNDR sites, so it lives here once. ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

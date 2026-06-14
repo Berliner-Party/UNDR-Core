@@ -1,0 +1,27 @@
+{
+    "name": "undr/core",
+    "description": "Shared core for UNDR event sites (HEAT, CAGE, UNLEASHED, …): the UNDR sync engine, view helpers, base CSS and JS.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Undr\\Core\\": "src/"
+        },
+        "files": [
+            "functions/html.php",
+            "functions/i18n.php",
+            "functions/dates.php",
+            "functions/events.php"
+        ]
+    },
+    "bin": [
+        "bin/undr-sync"
+    ],
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

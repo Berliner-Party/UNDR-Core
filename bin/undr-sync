@@ -1,0 +1,46 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+// ---------------------------------------------------------------------------
+// Generic UNDR sync CLI. Convenience entry point installed as vendor/bin/undr-sync.
+// Locates the host site's config/undr.php (walking up from the current working
+// directory) and runs the sync. Most sites instead ship a 3-line bin/sync.php
+// that calls \Undr\Core\Sync\Cli::run() directly — that path is preferred for cron.
+// ---------------------------------------------------------------------------
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit("undr-sync is a CLI tool\n");
+}
+
+// Find the Composer autoloader regardless of install layout (vendor/bin shim,
+// path repo, or direct invocation from the package).
+$autoloads = [
+    __DIR__ . '/../vendor/autoload.php',          // running from the package itself
+    __DIR__ . '/../../../autoload.php',           // installed under a site's vendor/
+];
+$loaded = false;
+foreach ($autoloads as $a) {
+    if (is_file($a)) { require $a; $loaded = true; break; }
+}
+if (!$loaded) {
+    fwrite(STDERR, "undr-sync: could not locate vendor/autoload.php\n");
+    exit(1);
+}
+
+// Resolve config: explicit arg, else config/undr.php under the CWD or its parents.
+$configPath = $argv[1] ?? null;
+if ($configPath === null) {
+    $dir = getcwd() ?: __DIR__;
+    for ($i = 0; $i < 6 && $dir !== '' && $dir !== '/'; $i++) {
+        if (is_file($dir . '/config/undr.php')) { $configPath = $dir . '/config/undr.php'; break; }
+        $dir = dirname($dir);
+    }
+}
+if ($configPath === null || !is_file($configPath)) {
+    fwrite(STDERR, "undr-sync: config/undr.php not found (pass a path as the first argument)\n");
+    exit(1);
+}
+
+exit(\Undr\Core\Sync\Cli::run(require $configPath));
