@@ -303,8 +303,13 @@ final class UndrSync
             }
         }
         // Blog post images, keyed by slug under /media/<brand>/blog/<slug>/.
+        // Only mirror the images of PUBLISHED posts — the ones that actually sync
+        // into blog.<lang>.json. A draft's image is never rendered, so don't copy it.
         foreach ($manifest['posts'] ?? [] as $p) {
             $slug = $p['slug'] ?? null;
+            if (empty($p['published'])) {
+                continue;
+            }
             foreach ($p['assets'] ?? [] as $a) {
                 $src  = $a['src'] ?? null;
                 $hash = $a['hash'] ?? null;
