@@ -394,6 +394,21 @@ final class UndrSync
                         $p['image'][$f] = $map[$p['image'][$f]];
                     }
                 }
+                // Responsive derivative tiers: rewrite each tier's `u` URL through
+                // the same map so mirrored local /media paths are served.
+                if (isset($p['image']['derivatives']) && is_array($p['image']['derivatives'])) {
+                    foreach (['webp', 'avif'] as $fmt) {
+                        if (!isset($p['image']['derivatives'][$fmt]) || !is_array($p['image']['derivatives'][$fmt])) {
+                            continue;
+                        }
+                        foreach ($p['image']['derivatives'][$fmt] as &$tier) {
+                            if (is_array($tier) && !empty($tier['u']) && isset($map[$tier['u']])) {
+                                $tier['u'] = $map[$tier['u']];
+                            }
+                        }
+                        unset($tier);
+                    }
+                }
             }
         }
         unset($p);
