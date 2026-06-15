@@ -11,11 +11,14 @@ use Undr\Core\Http\UndrHttp;
 // Reusable, brand-agnostic, dependency-free. Driven entirely by a config array.
 // Cron calls sync(); the website reads the cache snapshots written here.
 //
-//   GET {apiBase}/brands/{brand}/manifest                  → hashes per layer/event
-//   GET {apiBase}/brands/{brand}/events?lang={L}&when=all  → array of merged events
+//   GET {apiBase}/brands/{brand}/manifest          → hashes per layer/event/post
+//   GET {apiBase}/brands/{brand}/snapshot?lang={L} → { events:[…], posts:[…] }
 //
-// Smart caching: the manifest's per-layer + per-event hashes form a per-language
-// fingerprint; a language's snapshot is only refetched when its fingerprint
+// Events and blog posts ride the SAME per-language /snapshot request (one fetch,
+// one fingerprint) and are split into events.{L}.json + blog.{L}.json locally.
+//
+// Smart caching: the manifest's per-layer + per-event/post hashes form a
+// per-language fingerprint; a language's snapshot is only refetched when its
 // changes. Assets (flyer/promo) are mirrored locally and only re-downloaded when
 // their content hash changes. Writes are atomic (tmp → rename) so a web request
 // never observes a half-written snapshot. Any failure keeps the last-good cache.
@@ -162,7 +165,10 @@ final class UndrSync
             $r->assetsMirrored = $mirrored;
         }
 
-        // 3) Per-language fingerprint diff → fetch only changed languages.
+        // 3) Per-language fingerprint diff → fetch only changed languages. Events
+        //    AND blog posts ride ONE /snapshot request per language (one fetch,
+        //    one fingerprint), then split into their respective local snapshots —
+        //    the blog is no longer a separate API round-trip.
         $updatedAt   = $this->updatedAtById($manifest);
         $fingerprints = $state['fingerprints'] ?? [];
         $newFingerprints = $fingerprints;
@@ -170,73 +176,40 @@ final class UndrSync
         $anyWritten = false;
 
         foreach ($this->languages as $lang) {
-            $fp = $this->fingerprint($manifest, $lang);
-            $haveSnapshot = is_file($this->snapshotPath($lang));
+            $fp = $this->contentFingerprint($manifest, $lang);
+            $haveSnapshot = is_file($this->snapshotPath($lang)) && is_file($this->blogSnapshotPath($lang));
             if ($haveSnapshot && ($fingerprints[$lang] ?? null) === $fp) {
                 continue; // unchanged
             }
 
-            $evRes = $this->http->get($this->eventsUrl($lang), ['etag' => $langEtags[$lang] ?? null]);
-            if ($evRes->notModified()) { $newFingerprints[$lang] = $fp; continue; }
-            if (!$evRes->ok()) {
+            $snRes = $this->http->get($this->snapshotUrl($lang), ['etag' => $langEtags[$lang] ?? null]);
+            if ($snRes->notModified()) { $newFingerprints[$lang] = $fp; continue; }
+            if (!$snRes->ok()) {
                 $r->degraded = true;
-                $r->addError($evRes->transportError() ? 'network' : 'http', "events[$lang] status=" . $evRes->status);
-                continue; // keep this lang's old snapshot
+                $r->addError($snRes->transportError() ? 'network' : 'http', "snapshot[$lang] status=" . $snRes->status);
+                continue; // keep this lang's old snapshots
             }
-            $events = json_decode($evRes->body, true);
-            if (!$this->validEvents($events)) {
+            $snap = json_decode($snRes->body, true);
+            if (!is_array($snap) || !$this->validEvents($snap['events'] ?? null) || !$this->validBlogPosts($snap['posts'] ?? null)) {
                 $r->degraded = true;
-                $r->addError('schema', "events[$lang] shape invalid");
+                $r->addError('schema', "snapshot[$lang] shape invalid");
                 continue;
             }
 
-            $events = $this->injectUpdatedAt($events, $updatedAt);
+            $events = $this->injectUpdatedAt($snap['events'], $updatedAt);
+            $posts  = $snap['posts'];
             if ($this->assetsMode === 'mirror' && $assetMap) {
                 $events = $this->rewriteAssetUrls($events, $assetMap);
+                $posts  = $this->rewriteBlogAssetUrls($posts, $assetMap);
             }
 
             $this->writeJsonAtomic($this->snapshotPath($lang), $events);
+            $this->writeJsonAtomic($this->blogSnapshotPath($lang), $posts);
             $newFingerprints[$lang] = $fp;
-            if ($evRes->etag) $langEtags[$lang] = $evRes->etag;
+            if ($snRes->etag) $langEtags[$lang] = $snRes->etag;
             $r->changedLangs[] = $lang;
             $r->eventsWritten += count($events);
-            $anyWritten = true;
-        }
-
-        // 3b) Blog posts — same per-language fingerprint diff, separate snapshot.
-        $blogFingerprints    = $state['blogFingerprints'] ?? [];
-        $newBlogFingerprints = $blogFingerprints;
-        $blogEtags           = $state['blogEtags'] ?? [];
-
-        foreach ($this->languages as $lang) {
-            $fp = $this->blogFingerprint($manifest, $lang);
-            $haveSnapshot = is_file($this->blogSnapshotPath($lang));
-            if ($haveSnapshot && ($blogFingerprints[$lang] ?? null) === $fp) {
-                continue; // unchanged
-            }
-
-            $blRes = $this->http->get($this->blogUrl($lang), ['etag' => $blogEtags[$lang] ?? null]);
-            if ($blRes->notModified()) { $newBlogFingerprints[$lang] = $fp; continue; }
-            if (!$blRes->ok()) {
-                $r->degraded = true;
-                $r->addError($blRes->transportError() ? 'network' : 'http', "blog[$lang] status=" . $blRes->status);
-                continue; // keep this lang's old blog snapshot
-            }
-            $posts = json_decode($blRes->body, true);
-            if (!$this->validBlogPosts($posts)) {
-                $r->degraded = true;
-                $r->addError('schema', "blog[$lang] shape invalid");
-                continue;
-            }
-
-            if ($this->assetsMode === 'mirror' && $assetMap) {
-                $posts = $this->rewriteBlogAssetUrls($posts, $assetMap);
-            }
-
-            $this->writeJsonAtomic($this->blogSnapshotPath($lang), $posts);
-            $newBlogFingerprints[$lang] = $fp;
-            if ($blRes->etag) $blogEtags[$lang] = $blRes->etag;
-            $r->postsWritten += count($posts);
+            $r->postsWritten  += count($posts);
             $anyWritten = true;
         }
 
@@ -253,8 +226,6 @@ final class UndrSync
             'brandLastModified'    => $brandLM ?? ($state['brandLastModified'] ?? null),
             'fingerprints'         => $newFingerprints,
             'langEtags'            => $langEtags,
-            'blogFingerprints'     => $newBlogFingerprints,
-            'blogEtags'            => $blogEtags,
             'assets'               => $assetState,
         ]);
 
@@ -448,6 +419,13 @@ final class UndrSync
         return hash('sha256', implode('|', $parts));
     }
 
+    /** Combined per-language fingerprint covering both events and blog posts —
+     *  a change in either refetches the unified /snapshot for that language. */
+    private function contentFingerprint(array $manifest, string $lang): string
+    {
+        return hash('sha256', $this->fingerprint($manifest, $lang) . '|' . $this->blogFingerprint($manifest, $lang));
+    }
+
     private function updatedAtById(array $manifest): array
     {
         $map = [];
@@ -556,13 +534,9 @@ final class UndrSync
     // -----------------------------------------------------------------------
     private function statusUrl(): string { return $this->apiBase . '/status'; }
     private function manifestUrl(): string { return $this->apiBase . '/brands/' . rawurlencode($this->brand) . '/manifest'; }
-    private function eventsUrl(string $lang): string
+    private function snapshotUrl(string $lang): string
     {
-        return $this->apiBase . '/brands/' . rawurlencode($this->brand) . '/events?lang=' . rawurlencode($lang) . '&when=all';
-    }
-    private function blogUrl(string $lang): string
-    {
-        return $this->apiBase . '/brands/' . rawurlencode($this->brand) . '/blog?lang=' . rawurlencode($lang) . '&status=published';
+        return $this->apiBase . '/brands/' . rawurlencode($this->brand) . '/snapshot?lang=' . rawurlencode($lang);
     }
     private function snapshotPath(string $lang): string { return $this->cacheDir . '/events.' . $lang . '.json'; }
     private function blogSnapshotPath(string $lang): string { return $this->cacheDir . '/blog.' . $lang . '.json'; }
