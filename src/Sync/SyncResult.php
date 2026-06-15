@@ -11,6 +11,7 @@ final class SyncResult
     public string $source        = 'none';  // 'api' | 'not-modified' | 'cache' | 'none'
     public array  $changedLangs  = [];      // langs whose snapshot was rewritten this run
     public int    $eventsWritten = 0;
+    public int    $postsWritten  = 0;       // blog posts written across languages this run
     public int    $assetsMirrored= 0;
     public array  $errors        = [];      // [['kind'=>'network|http|json|schema','msg'=>...], ...]
     public int    $exitCode      = 0;       // 0 = ok / ok-degraded, 1 = hard module fault
@@ -31,6 +32,7 @@ final class SyncResult
             'skipped=' . ($this->skipped ? '1' : '0'),
             'langs=' . ($this->changedLangs ? implode(',', $this->changedLangs) : '-'),
             'events=' . $this->eventsWritten,
+            'posts=' . $this->postsWritten,
             'assets=' . $this->assetsMirrored,
             'ms=' . (int) $this->durationMs,
         ];

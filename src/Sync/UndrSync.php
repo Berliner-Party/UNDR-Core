@@ -203,6 +203,43 @@ final class UndrSync
             $anyWritten = true;
         }
 
+        // 3b) Blog posts — same per-language fingerprint diff, separate snapshot.
+        $blogFingerprints    = $state['blogFingerprints'] ?? [];
+        $newBlogFingerprints = $blogFingerprints;
+        $blogEtags           = $state['blogEtags'] ?? [];
+
+        foreach ($this->languages as $lang) {
+            $fp = $this->blogFingerprint($manifest, $lang);
+            $haveSnapshot = is_file($this->blogSnapshotPath($lang));
+            if ($haveSnapshot && ($blogFingerprints[$lang] ?? null) === $fp) {
+                continue; // unchanged
+            }
+
+            $blRes = $this->http->get($this->blogUrl($lang), ['etag' => $blogEtags[$lang] ?? null]);
+            if ($blRes->notModified()) { $newBlogFingerprints[$lang] = $fp; continue; }
+            if (!$blRes->ok()) {
+                $r->degraded = true;
+                $r->addError($blRes->transportError() ? 'network' : 'http', "blog[$lang] status=" . $blRes->status);
+                continue; // keep this lang's old blog snapshot
+            }
+            $posts = json_decode($blRes->body, true);
+            if (!$this->validBlogPosts($posts)) {
+                $r->degraded = true;
+                $r->addError('schema', "blog[$lang] shape invalid");
+                continue;
+            }
+
+            if ($this->assetsMode === 'mirror' && $assetMap) {
+                $posts = $this->rewriteBlogAssetUrls($posts, $assetMap);
+            }
+
+            $this->writeJsonAtomic($this->blogSnapshotPath($lang), $posts);
+            $newBlogFingerprints[$lang] = $fp;
+            if ($blRes->etag) $blogEtags[$lang] = $blRes->etag;
+            $r->postsWritten += count($posts);
+            $anyWritten = true;
+        }
+
         // 4) Persist manifest + state (snapshots already durably written above).
         $this->writeRawAtomic($this->cacheDir . '/manifest.json', $res->body);
         $this->writeJsonAtomic($this->cacheDir . '/state.json', [
@@ -216,6 +253,8 @@ final class UndrSync
             'brandLastModified'    => $brandLM ?? ($state['brandLastModified'] ?? null),
             'fingerprints'         => $newFingerprints,
             'langEtags'            => $langEtags,
+            'blogFingerprints'     => $newBlogFingerprints,
+            'blogEtags'            => $blogEtags,
             'assets'               => $assetState,
         ]);
 
@@ -263,7 +302,39 @@ final class UndrSync
                 }
             }
         }
+        // Blog post images, keyed by slug under /media/<brand>/blog/<slug>/.
+        foreach ($manifest['posts'] ?? [] as $p) {
+            $slug = $p['slug'] ?? null;
+            foreach ($p['assets'] ?? [] as $a) {
+                $src  = $a['src'] ?? null;
+                $hash = $a['hash'] ?? null;
+                if (!$src || !$hash || !$slug) continue;
+
+                $local = $this->localBlogAssetPath($slug, $src, $hash);
+                $diskPath = $this->mediaDir . $this->localToFsSuffix($local);
+
+                if (($assetState[$src]['hash'] ?? null) === $hash && is_file($diskPath)) {
+                    $map[$src] = $local;
+                    continue;
+                }
+                if ($this->downloadTo($src, $diskPath)) {
+                    $map[$src] = $local;
+                    $assetState[$src] = ['hash' => $hash, 'local' => $local];
+                    $mirrored++;
+                } else {
+                    $r->addError('asset', 'mirror failed: ' . $src);
+                }
+            }
+        }
         return [$map, $assetState, $mirrored];
+    }
+
+    /** Public /media URL for a mirrored post image, hash-prefixed for cache-busting. */
+    private function localBlogAssetPath(string $slug, string $src, string $hash): string
+    {
+        $base = basename(parse_url($src, PHP_URL_PATH) ?: $src);
+        $sha8 = substr(preg_replace('~^sha256:~', '', $hash), 0, 8);
+        return $this->mediaBaseUrl . '/' . rawurlencode($this->brand) . '/blog/' . $slug . '/' . $sha8 . '.' . $base;
     }
 
     /** Public /media URL for a mirrored asset, hash-prefixed for cache-busting. */
@@ -308,6 +379,22 @@ final class UndrSync
         return $events;
     }
 
+    /** Rewrite post image absolute UNDR URLs to local /media URLs where mirrored. */
+    private function rewriteBlogAssetUrls(array $posts, array $map): array
+    {
+        foreach ($posts as &$p) {
+            if (isset($p['image']) && is_array($p['image'])) {
+                foreach (['src', 'webp'] as $f) {
+                    if (!empty($p['image'][$f]) && isset($map[$p['image'][$f]])) {
+                        $p['image'][$f] = $map[$p['image'][$f]];
+                    }
+                }
+            }
+        }
+        unset($p);
+        return $posts;
+    }
+
     // -----------------------------------------------------------------------
     // Manifest helpers
     // -----------------------------------------------------------------------
@@ -321,6 +408,22 @@ final class UndrSync
         usort($events, fn($a, $b) => strcmp($a['id'] ?? '', $b['id'] ?? ''));
         foreach ($events as $ev) {
             $parts[] = ($ev['id'] ?? '') . '=' . ($ev['hashes'][$lang] ?? '');
+        }
+        return hash('sha256', implode('|', $parts));
+    }
+
+    /** Per-language blog fingerprint from the manifest's blog layers + post hashes. */
+    private function blogFingerprint(array $manifest, string $lang): string
+    {
+        $parts = [
+            'blog.defaults:'      . ($manifest['layers']['blog.defaults']['hash'] ?? ''),
+            'blog.strings.' . $lang . ':' . ($manifest['layers']['blog.strings.' . $lang]['hash'] ?? ''),
+        ];
+        $posts = $manifest['posts'] ?? [];
+        usort($posts, fn($a, $b) => strcmp($a['id'] ?? '', $b['id'] ?? ''));
+        foreach ($posts as $p) {
+            // include published flag so unpublishing flips the fingerprint
+            $parts[] = ($p['id'] ?? '') . '=' . ($p['hashes'][$lang] ?? '') . ($p['published'] ?? false ? ':1' : ':0');
         }
         return hash('sha256', implode('|', $parts));
     }
@@ -361,6 +464,15 @@ final class UndrSync
         if (!is_array($events) || ($events !== [] && !array_is_list($events))) return false;
         foreach ($events as $e) {
             if (!is_array($e) || empty($e['id']) || empty($e['date']) || empty($e['name'])) return false;
+        }
+        return true;
+    }
+
+    private function validBlogPosts($posts): bool
+    {
+        if (!is_array($posts) || ($posts !== [] && !array_is_list($posts))) return false;
+        foreach ($posts as $p) {
+            if (!is_array($p) || empty($p['id']) || empty($p['slug']) || empty($p['title'])) return false;
         }
         return true;
     }
@@ -414,7 +526,9 @@ final class UndrSync
     {
         if ($this->languages === []) return false;
         foreach ($this->languages as $lang) {
-            if (!is_file($this->snapshotPath($lang))) return false;
+            // Blog snapshot is required too; on first upgrade it's missing, so the
+            // brand is "not primed" once and does a full fetch to populate it.
+            if (!is_file($this->snapshotPath($lang)) || !is_file($this->blogSnapshotPath($lang))) return false;
         }
         return true;
     }
@@ -426,5 +540,10 @@ final class UndrSync
     {
         return $this->apiBase . '/brands/' . rawurlencode($this->brand) . '/events?lang=' . rawurlencode($lang) . '&when=all';
     }
+    private function blogUrl(string $lang): string
+    {
+        return $this->apiBase . '/brands/' . rawurlencode($this->brand) . '/blog?lang=' . rawurlencode($lang) . '&status=published';
+    }
     private function snapshotPath(string $lang): string { return $this->cacheDir . '/events.' . $lang . '.json'; }
+    private function blogSnapshotPath(string $lang): string { return $this->cacheDir . '/blog.' . $lang . '.json'; }
 }

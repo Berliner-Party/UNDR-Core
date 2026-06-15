@@ -58,3 +58,34 @@ if (!function_exists('event_dt')) {
 if (!function_exists('lowest_price')) {
     function lowest_price(array $e): ?array { return EventDerive::lowestPrice($e); }
 }
+
+// alt_ticket_links is byte-identical across HEAT/UNLEASHED and was missing on
+// CAGE; promoted here so every site (incl. the buy-tickets page) and future
+// brands get the same "also available on …" list. It calls primary_ticket_link
+// (which STAYS per-brand — CAGE intentionally omits the rausgegangen widget
+// loader) and the Core i18n helper t(); the labels open_ticket_shop /
+// tickets_generic must exist in each brand's lang catalog.
+if (!function_exists('alt_ticket_links')) {
+    function alt_ticket_links(array $e): array
+    {
+        $primary    = function_exists('primary_ticket_link') ? primary_ticket_link($e) : ($e['ticketLinks'][0] ?? null);
+        $primaryUrl = $primary['url'] ?? null;
+        $providerLabels = ['ra' => 'Resident Advisor', 'rausgegangen' => 'Rausgegangen'];
+
+        $alts = [];
+        if ($primaryUrl) {
+            $alts[] = [
+                'label' => $providerLabels[$primary['provider'] ?? ''] ?? t('open_ticket_shop'),
+                'url'   => $primaryUrl,
+            ];
+        }
+        foreach ($e['ticketLinks'] ?? [] as $l) {
+            if (empty($l['url']) || $l['url'] === $primaryUrl) continue;
+            $alts[] = [
+                'label' => $providerLabels[$l['provider'] ?? ''] ?? ucfirst($l['provider'] ?? t('tickets_generic')),
+                'url'   => $l['url'],
+            ];
+        }
+        return $alts;
+    }
+}

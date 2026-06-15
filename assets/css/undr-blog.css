@@ -1,0 +1,118 @@
+/* =========================================================================
+   UNDR Core — shared blog stylesheet.
+
+   Linked on the blog index (/news/) and single-post pages, AFTER undr-base.css
+   and the brand sheet:
+     <link rel="stylesheet" href="/assets/undr-base.css?v=…">
+     <link rel="stylesheet" href="/assets/<brand>.css?v=…">
+     <link rel="stylesheet" href="/assets/undr-blog.css?v=…">
+
+   Authored entirely against the --undr-* token contract, so every brand themes
+   the blog through its existing :root mapping — no per-brand blog CSS needed.
+   All selectors are `undr-`-prefixed to avoid clashing with brand components.
+   ========================================================================= */
+
+.undr-blog {
+  max-width: var(--undr-max-w);
+  margin: 0 auto;
+  padding: var(--undr-section-y) var(--undr-gutter);
+}
+
+/* ---- Index grid of post cards ---- */
+.undr-blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: clamp(1rem, 3vw, 1.8rem);
+  margin-top: 2rem;
+}
+
+.undr-post-card {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+  background: var(--undr-bg-tint);
+  border: 1px solid var(--undr-rule);
+  border-radius: var(--undr-radius);
+  overflow: hidden;
+  transition: border-color var(--undr-t-base) var(--undr-ease),
+              transform var(--undr-t-base) var(--undr-ease);
+}
+.undr-post-card:hover { border-color: var(--undr-rule-2); transform: translateY(-2px); }
+.undr-post-card:focus-visible { outline: none; box-shadow: var(--undr-focus); }
+
+.undr-post-card__media {
+  aspect-ratio: 16 / 9;
+  background: var(--undr-surface-1);
+  overflow: hidden;
+}
+.undr-post-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.undr-post-card__body { padding: 1.1rem 1.2rem 1.4rem; display: flex; flex-direction: column; gap: .5rem; flex: 1; }
+.undr-post-card__date { font-family: var(--undr-font-mono); font-size: var(--undr-fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--undr-ink-faint); }
+.undr-post-card__title { font-family: var(--undr-font-display); font-size: var(--undr-fs-lg); line-height: 1.18; margin: 0; color: var(--undr-ink); }
+.undr-post-card__excerpt { font-size: var(--undr-fs-sm); color: var(--undr-ink-mid); margin: 0; }
+
+/* ---- Badge ---- */
+.undr-badge {
+  align-self: flex-start;
+  font-family: var(--undr-font-mono);
+  font-size: var(--undr-fs-xs);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: .25em .6em;
+  border: 1px solid var(--undr-rule-2);
+  border-radius: var(--undr-radius);
+  color: var(--undr-ink-mid);
+}
+.undr-badge--award { color: var(--undr-accent); border-color: var(--undr-accent); }
+.undr-badge--note  { color: var(--undr-ink-faint); }
+
+/* ---- Single post ---- */
+.undr-post { max-width: var(--undr-prose-w); margin: 0 auto; padding: var(--undr-section-y) var(--undr-gutter); }
+.undr-post__kicker { font-family: var(--undr-font-mono); font-size: var(--undr-fs-xs); letter-spacing: .12em; text-transform: uppercase; color: var(--undr-ink-faint); }
+.undr-post__kicker a { color: inherit; }
+.undr-post__title { font-family: var(--undr-font-display); font-size: var(--undr-fs-2xl); line-height: 1.1; margin: .4rem 0 .6rem; color: var(--undr-ink); }
+.undr-post__meta { font-family: var(--undr-font-mono); font-size: var(--undr-fs-xs); letter-spacing: .06em; text-transform: uppercase; color: var(--undr-ink-faint); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.undr-post__hero { margin: 1.6rem 0; border-radius: var(--undr-radius); overflow: hidden; background: var(--undr-surface-1); }
+.undr-post__hero img { width: 100%; height: auto; display: block; }
+
+/* ---- Prose (the rendered bodyHtml) ---- */
+.undr-prose { font-size: var(--undr-fs-md); line-height: 1.7; color: var(--undr-ink-mid); }
+.undr-prose > * + * { margin-top: 1.1em; }
+.undr-prose h2 { font-family: var(--undr-font-display); font-size: var(--undr-fs-xl); line-height: 1.2; color: var(--undr-ink); margin-top: 1.8em; }
+.undr-prose h3 { font-family: var(--undr-font-display); font-size: var(--undr-fs-lg); color: var(--undr-ink); margin-top: 1.5em; }
+.undr-prose h4 { font-size: var(--undr-fs-md); color: var(--undr-ink); margin-top: 1.4em; text-transform: uppercase; letter-spacing: .05em; }
+.undr-prose a { color: var(--undr-accent); text-underline-offset: .15em; }
+.undr-prose strong { color: var(--undr-ink); }
+.undr-prose ul, .undr-prose ol { padding-left: 1.4em; }
+.undr-prose li + li { margin-top: .35em; }
+.undr-prose blockquote { border-left: 2px solid var(--undr-accent); padding-left: 1rem; color: var(--undr-ink-faint); font-style: italic; }
+.undr-prose code { font-family: var(--undr-font-mono); font-size: .9em; background: var(--undr-surface-1); padding: .1em .4em; border-radius: var(--undr-radius); color: var(--undr-ink); }
+.undr-prose pre { background: var(--undr-surface-1); border: 1px solid var(--undr-rule); border-radius: var(--undr-radius); padding: 1rem 1.1rem; overflow: auto; }
+.undr-prose pre code { background: none; padding: 0; }
+.undr-prose img { max-width: 100%; height: auto; border-radius: var(--undr-radius); }
+.undr-prose hr { border: 0; border-top: 1px solid var(--undr-rule); margin: 2em 0; }
+
+/* ---- Share row ---- */
+.undr-share { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin: 1.6rem 0; }
+.undr-share a, .undr-share button {
+  font-family: var(--undr-font-mono);
+  font-size: var(--undr-fs-xs);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--undr-ink-mid);
+  background: transparent;
+  border: 1px solid var(--undr-rule-2);
+  border-radius: var(--undr-radius);
+  padding: .5em .9em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--undr-t-fast) var(--undr-ease), color var(--undr-t-fast) var(--undr-ease);
+}
+.undr-share a:hover, .undr-share button:hover { color: var(--undr-ink); border-color: var(--undr-accent); }
+.undr-share button:focus-visible { outline: none; box-shadow: var(--undr-focus); }
+
+/* ---- Read-next rail ---- */
+.undr-readnext { margin-top: var(--undr-section-y); border-top: 1px solid var(--undr-rule); padding-top: 2rem; }
+.undr-readnext h2 { font-family: var(--undr-font-display); font-size: var(--undr-fs-lg); color: var(--undr-ink); margin: 0 0 1.2rem; }

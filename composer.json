@@ -14,7 +14,8 @@
             "functions/html.php",
             "functions/i18n.php",
             "functions/dates.php",
-            "functions/events.php"
+            "functions/events.php",
+            "functions/blog.php"
         ]
     },
     "bin": [
