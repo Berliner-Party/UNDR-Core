@@ -35,18 +35,27 @@
   border: 1px solid var(--undr-rule);
   border-radius: var(--undr-radius);
   overflow: hidden;
-  transition: border-color var(--undr-t-base) var(--undr-ease),
-              transform var(--undr-t-base) var(--undr-ease);
+  transition: border-color var(--undr-t-fast) var(--undr-ease),
+              transform var(--undr-t-fast) var(--undr-ease);
 }
-.undr-post-card:hover { border-color: var(--undr-rule-2); transform: translateY(-2px); }
 .undr-post-card:focus-visible { outline: none; box-shadow: var(--undr-focus); }
+.undr-post-card:active { transform: scale(.99); } /* press feedback — also fires on touch */
 
 .undr-post-card__media {
   aspect-ratio: 16 / 9;
   background: var(--undr-surface-1);
   overflow: hidden;
 }
-.undr-post-card__media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.undr-post-card__media img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform var(--undr-t-base) var(--undr-ease);
+}
+
+/* Movement-hovers gated: a touch tap fires :hover and would jump the card. */
+@media (hover: hover) and (pointer: fine) {
+  .undr-post-card:hover { border-color: var(--undr-rule-2); transform: translateY(-2px); }
+  .undr-post-card:hover .undr-post-card__media img { transform: scale(1.04); }
+}
 
 .undr-post-card__body { padding: 1.1rem 1.2rem 1.4rem; display: flex; flex-direction: column; gap: .5rem; flex: 1; }
 .undr-post-card__date { font-family: var(--undr-font-mono); font-size: var(--undr-fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--undr-ink-faint); }
@@ -83,7 +92,8 @@
 .undr-prose h2 { font-family: var(--undr-font-display); font-size: var(--undr-fs-xl); line-height: 1.2; color: var(--undr-ink); margin-top: 1.8em; }
 .undr-prose h3 { font-family: var(--undr-font-display); font-size: var(--undr-fs-lg); color: var(--undr-ink); margin-top: 1.5em; }
 .undr-prose h4 { font-size: var(--undr-fs-md); color: var(--undr-ink); margin-top: 1.4em; text-transform: uppercase; letter-spacing: .05em; }
-.undr-prose a { color: var(--undr-accent); text-underline-offset: .15em; }
+.undr-prose a { color: var(--undr-accent); text-underline-offset: .15em; transition: color var(--undr-t-fast) var(--undr-ease); }
+.undr-prose a:hover { color: var(--undr-accent-hot); }
 .undr-prose strong { color: var(--undr-ink); }
 .undr-prose ul, .undr-prose ol { padding-left: 1.4em; }
 .undr-prose li + li { margin-top: .35em; }
@@ -108,11 +118,23 @@
   padding: .5em .9em;
   text-decoration: none;
   cursor: pointer;
-  transition: border-color var(--undr-t-fast) var(--undr-ease), color var(--undr-t-fast) var(--undr-ease);
+  transition: border-color var(--undr-t-fast) var(--undr-ease),
+              color var(--undr-t-fast) var(--undr-ease),
+              transform var(--undr-t-fast) var(--undr-ease);
 }
 .undr-share a:hover, .undr-share button:hover { color: var(--undr-ink); border-color: var(--undr-accent); }
+.undr-share a:active, .undr-share button:active { transform: scale(.96); } /* press feedback */
 .undr-share button:focus-visible { outline: none; box-shadow: var(--undr-focus); }
 
 /* ---- Read-next rail ---- */
 .undr-readnext { margin-top: var(--undr-section-y); border-top: 1px solid var(--undr-rule); padding-top: 2rem; }
 .undr-readnext h2 { font-family: var(--undr-font-display); font-size: var(--undr-fs-lg); color: var(--undr-ink); margin: 0 0 1.2rem; }
+
+/* ---- Reduced motion: keep colour/border cues, drop transform movement ---- */
+@media (prefers-reduced-motion: reduce) {
+  .undr-post-card:hover,
+  .undr-post-card:active,
+  .undr-post-card:hover .undr-post-card__media img,
+  .undr-share a:active,
+  .undr-share button:active { transform: none; }
+}
