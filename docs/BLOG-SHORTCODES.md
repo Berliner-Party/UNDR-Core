@@ -65,7 +65,9 @@ lightbox with prev/next (arrow keys work, Esc closes). Per-image alt goes after 
 Block-only — inline galleries render nothing. Long payloads may wrap across lines;
 that's fine.
 
-## `[video: youtube-url-or-id | title]` — GDPR click-to-load video
+## `[video: …]` — YouTube facade or local MP4 player
+
+**YouTube** (watch / youtu.be / shorts / embed URL, or the bare 11-char ID):
 
 ```
 [video: https://www.youtube.com/watch?v=dQw4w9WgXcQ | HEAT Aftermovie 2026]
@@ -74,9 +76,23 @@ that's fine.
 
 Renders a 16:9 facade (play glyph + title) that makes **zero third-party requests**
 until clicked — then it swaps in a `youtube-nocookie.com` iframe. Without JavaScript
-(and in feed readers) it's a plain link to YouTube. Accepts watch / youtu.be /
-shorts / embed URLs or the bare 11-char ID. Sites with a strict CSP need
+(and in feed readers) it's a plain link to YouTube. Sites with a strict CSP need
 `frame-src https://www.youtube-nocookie.com` (HEAT and CAGE ship it).
+
+**Local file** — a URL ending in `.mp4` / `.webm` / `.mov` renders a native
+first-party `<video>` player instead (controls, `preload="metadata"` so the first
+frame shows). Ratio is configurable — `16:9` (default) or `9:16` (vertical reel,
+height-capped and centered) — and a `loop` flag makes it autoplay muted + looped:
+
+```
+[video: /media/clips/aftermovie.mp4 | Aftermovie 2026]
+[video: https://undr.zone/media/heat/teaser.mp4 | Teaser | 9:16]
+[video: /media/clips/reel.mp4 | Backstage reel | 9:16 | loop]
+```
+
+The title shows as a caption below the player. Host clips on the site itself or on
+undr.zone (CAGE's CSP allows exactly those two: `media-src 'self' https://undr.zone`;
+HEAT allows any https source).
 
 ## `[button: url | label]` — CTA button
 

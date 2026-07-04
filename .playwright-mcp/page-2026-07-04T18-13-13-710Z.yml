@@ -1,0 +1,68 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - navigation "Primary" [ref=e3]:
+    - list [ref=e4]:
+      - listitem [ref=e5]:
+        - link "Home" [ref=e6] [cursor=pointer]:
+          - /url: /
+      - listitem [ref=e7]:
+        - link "Buy Tickets" [ref=e8] [cursor=pointer]:
+          - /url: /buy-tickets/
+      - listitem [ref=e9]:
+        - link "News" [ref=e10] [cursor=pointer]:
+          - /url: /news/
+    - generic "Language" [ref=e11]:
+      - link "EN" [ref=e12] [cursor=pointer]:
+        - /url: http://127.0.0.1:8079/shortcode-smoke/
+      - generic [ref=e13]: /
+      - link "DE" [ref=e14] [cursor=pointer]:
+        - /url: http://127.0.0.1:8079/de/shortcode-smoke/
+  - main [ref=e15]:
+    - article [ref=e16]:
+      - paragraph [ref=e17]:
+        - link "← News" [ref=e18] [cursor=pointer]:
+          - /url: /news/
+      - heading "Shortcode Smoke" [level=1] [ref=e19]
+      - time [ref=e21]: 01 JUL 2026
+      - generic [ref=e22]:
+        - generic [ref=e23]: Share
+        - link "WhatsApp" [ref=e24] [cursor=pointer]:
+          - /url: https://wa.me/?text=Shortcode%20Smoke%20http%3A%2F%2F127.0.0.1%3A8079%2Fshortcode-smoke%2F
+        - link "Telegram" [ref=e25] [cursor=pointer]:
+          - /url: https://t.me/share/url?url=http%3A%2F%2F127.0.0.1%3A8079%2Fshortcode-smoke%2F&text=Shortcode%20Smoke
+        - button "Copy link" [ref=e26] [cursor=pointer]
+      - generic [ref=e27]:
+        - 'complementary "CAGE: CAGE by UNDR" [ref=e28]':
+          - link [ref=e29] [cursor=pointer]:
+            - /url: /#event=cage-2026-07-10
+          - generic [ref=e31]:
+            - paragraph [ref=e32]: CAGE
+            - heading "CAGE by UNDR" [level=3] [ref=e33]
+            - paragraph [ref=e34]: Fri, 10 Jul 2026 · 23:00 · AMT, Berlin
+            - paragraph [ref=e35]: The first CAGE by UNDR — two floors of Techno and Hard Techno at AMT, Berlin. Kinky, consent-led, no photos. Step inside. Lock the world out.
+            - generic [ref=e36]:
+              - link "Buy Tickets" [ref=e37] [cursor=pointer]:
+                - /url: https://ra.co/events/2436356
+              - link "More Info" [ref=e38] [cursor=pointer]:
+                - /url: /#event=cage-2026-07-10
+        - figure "Up close" [ref=e39]:
+          - link "Flyer" [ref=e40] [cursor=pointer]:
+            - /url: https://undr.zone/media/cage/2026-07-10/flyer.png
+            - img "Flyer" [ref=e41]
+          - generic [ref=e42]: Up close
+        - link "Aftermovie" [ref=e44] [cursor=pointer]:
+          - /url: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+          - generic [ref=e46]: Aftermovie
+        - blockquote [ref=e47]:
+          - paragraph [ref=e48]: Locked in.
+          - generic [ref=e49]: A guest
+      - generic [ref=e50]:
+        - heading "Ready for the next CAGE?" [level=2] [ref=e51]
+        - link "Buy tickets" [ref=e52] [cursor=pointer]:
+          - /url: /buy-tickets/
+  - contentinfo [ref=e53]:
+    - link "CAGE · by UNDR" [ref=e54] [cursor=pointer]:
+      - /url: https://undr.zone
+    - link "Impressum" [ref=e56] [cursor=pointer]:
+      - /url: /impressum

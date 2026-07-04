@@ -378,6 +378,25 @@
 }
 .undr-video__iframe { width: 100%; height: 100%; border: 0; display: block; }
 
+/* Local (self-hosted) variant: native <video> inside the same ratio box,
+   wrapped in .undr-figure--video so the caption reuses the figure styling.
+   contain — never crop (matches the brands' flyer components). */
+.undr-figure--video .undr-video { margin: 0; }
+.undr-video--local video {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #000;   /* letterbox bars — video-black regardless of brand surface */
+  border-radius: 0;   /* clipped by the ratio box; cancel .undr-prose video rounding */
+}
+.undr-video--vertical {
+  aspect-ratio: 9 / 16;
+  /* A 9:16 reel must not fill the column: cap by height (~78vh), center it. */
+  max-width: min(100%, calc(78vh * 9 / 16));
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ---- Shortcode: [button] CTA ---- */
 .undr-cta { margin: 1.6em 0; }
 .undr-cta__btn {

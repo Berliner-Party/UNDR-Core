@@ -1,0 +1,245 @@
+- generic [active] [ref=e1]:
+  - link "Skip to content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "UNLEASHED by UNDR — Home" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img [ref=e6]
+        - img "UNLEASHED" [ref=e8]
+      - navigation "Main navigation" [ref=e9]:
+        - list [ref=e10]:
+          - listitem [ref=e11]:
+            - link "Dress Code" [ref=e12] [cursor=pointer]:
+              - /url: /dresscode/
+          - listitem [ref=e13]:
+            - link "Rules" [ref=e14] [cursor=pointer]:
+              - /url: /rules/
+          - listitem [ref=e15]:
+            - link "FAQ" [ref=e16] [cursor=pointer]:
+              - /url: /faq/
+          - listitem [ref=e17]:
+            - link "About" [ref=e18] [cursor=pointer]:
+              - /url: /about-us/
+          - listitem [ref=e19]:
+            - link "News" [ref=e20] [cursor=pointer]:
+              - /url: /news/
+          - listitem [ref=e21]:
+            - link "Shop" [ref=e22] [cursor=pointer]:
+              - /url: https://shop.unleashed.berlin/
+        - generic "Language" [ref=e23]:
+          - link "EN" [ref=e24] [cursor=pointer]:
+            - /url: /news/
+          - generic [ref=e25]: /
+          - link "DE" [ref=e26] [cursor=pointer]:
+            - /url: /de/news/
+      - link "Buy Tickets" [ref=e27] [cursor=pointer]:
+        - /url: /buy-tickets/
+  - main [ref=e28]:
+    - article [ref=e30]:
+      - generic [ref=e31]:
+        - paragraph [ref=e32]:
+          - link "← All news" [ref=e33] [cursor=pointer]:
+            - /url: /news/
+        - heading "Berlin Fashion Week Gets UNLEASHED" [level=1] [ref=e34]
+        - paragraph [ref=e35]:
+          - generic [ref=e36]: Past night
+          - time [ref=e37]: Published 16 JAN 2026
+        - generic "Share this post" [ref=e38]:
+          - generic [ref=e39]: Share
+          - link "Share on WhatsApp" [ref=e40] [cursor=pointer]:
+            - /url: https://wa.me/?text=Berlin%20Fashion%20Week%20Gets%20UNLEASHED%20http%3A%2F%2F127.0.0.1%3A8077%2Fberlin-fashion-week-gets-unleashed%2F
+            - text: WhatsApp
+          - link "Share on Telegram" [ref=e41] [cursor=pointer]:
+            - /url: https://t.me/share/url?url=http%3A%2F%2F127.0.0.1%3A8077%2Fberlin-fashion-week-gets-unleashed%2F&text=Berlin%20Fashion%20Week%20Gets%20UNLEASHED
+            - text: Telegram
+          - button "Copy link" [ref=e42] [cursor=pointer]
+      - figure [ref=e43]:
+        - img "Fashion-forward fetish look on the dancefloor at UNLEASHED Berlin Fashion Week, Insomnia Berlin" [ref=e45]
+      - generic [ref=e46]:
+        - paragraph [ref=e47]:
+          - strong [ref=e48]: Berlin Fashion Week
+          - text: is upon us, and we’re
+          - strong [ref=e49]: beyond excited
+          - text: that our next
+          - strong [ref=e50]: UNLEASHED
+          - text: party lands right in the middle of the fashion frenzy. This is the moment where haute couture meets club culture. As the runways heat up during the day, we can’t wait to see
+          - strong [ref=e51]: fashion-forward outfits
+          - text: lighting up our dance floor at night. From avant-garde latex looks to elegant fetish-inspired ensembles, bring your boldest style! Nothing is off-limits as long as it’s
+          - strong [ref=e52]: sexy, edgy, and unapologetically you
+          - text: .
+        - heading "Fashion-Forward Meets Fetish Fun" [level=2] [ref=e53]
+        - paragraph [ref=e54]:
+          - text: During
+          - link "Fashion Week, Berlin is a playground of creativity and self-expression — and UNLEASHED is the perfect afterparty" [ref=e55] [cursor=pointer]:
+            - /url: https://berliner.party/en/news/berlin-fashion-week-after-parties-2026
+            - text: Fashion Week, Berlin is a playground of creativity and self-expression — and
+            - strong [ref=e56]: UNLEASHED
+            - text: is the perfect afterparty
+          - text: to keep that energy going. Expect a crowd decked out in
+          - strong [ref=e57]: glamorous meets kinky
+          - text: "attire: think"
+          - strong [ref=e58]: leather harnesses paired with high-fashion flair
+          - text: ", or runway-worthy lingerie under club lights. We encourage you to"
+          - strong [ref=e59]: go wild with your wardrobe
+          - text: . After all, nothing is more
+          - emphasis [ref=e60]: Berlin
+          - text: than a little kinky
+          - strong [ref=e61]: sex-positivity after the runway all day long
+          - text: ", mixing high style with raw vibes. This night is all about"
+          - strong [ref=e62]: playful provocation
+          - text: and showing off your personal vibe, whether you’re channeling a fetish fashion model or just rocking your most daring clubwear.
+        - heading "Party All Night — Till 6 AM!" [level=2] [ref=e63]
+        - paragraph [ref=e64]:
+          - text: Get ready for a night that
+          - strong [ref=e65]: goes full throttle until sunrise
+          - text: . Our DJs will be dropping relentless techno beats from
+          - strong [ref=e66]: 22:00 in the evening all the way to 06:00 in the morning
+          - text: . We’re taking you on an
+          - strong [ref=e67]: all-night journey
+          - text: ", so pace yourself and wear those dancing shoes. The atmosphere will be unleashed: two floors including our infamous dungeon space, and an anything-goes (consensual) attitude. This is Berlin nightlife at its finest —"
+          - strong [ref=e68]: uninhibited, energetic, and alive
+          - text: until dawn.
+        - heading "A True Berlin Experience at UNLEASHED" [level=2] [ref=e69]
+        - paragraph [ref=e70]:
+          - img "UNLEASHED Fashion Week edition flyer — Saturday, January 31 at Insomnia Berlin" [ref=e71]
+        - paragraph [ref=e72]:
+          - text: We’re hosting this
+          - strong [ref=e73]: edition of UNLEASHED
+          - text: at
+          - strong [ref=e74]: Insomnia Club
+          - text: ", a venue with its own long history. Insomnia was once famed as a swinger club, but in recent years it has evolved into a"
+          - strong [ref=e75]: full-fledged sex-positive nightclub
+          - text: on the weekends. In this liberated space,
+          - strong [ref=e76]: everyone is welcome
+          - text: to be themselves, whether you’re a Fashion Week VIP, a techno traveler, or a curious local. The club’s inclusive, anything-can-happen spirit embodies Berlin’s ethos of freedom.
+          - strong [ref=e77]: Dance, connect, explore
+          - text: — at UNLEASHED, you can revel in the freedom to express yourself, surrounded by an open-minded crowd that loves to mix
+          - strong [ref=e78]: fetish fantasy with Berlin’s techno heartbeat
+          - text: .
+        - paragraph [ref=e79]:
+          - strong [ref=e80]: Ready to unleash your wild side?
+          - text: Don’t miss out on this one-of-a-kind party.
+          - link "Grab your tickets" [ref=e81] [cursor=pointer]:
+            - /url: /buy-tickets/
+            - strong [ref=e82]: Grab your tickets
+          - text: and join us on
+          - strong [ref=e83]: Saturday, Jan 31st at 22:00
+          - text: . We’ll be dancing, flirting, and flaunting our style
+          - strong [ref=e84]: all night long
+          - text: .
+        - 'complementary "UNLEASHED: UNLEASHED by UNDR - Kinky CSD Afterparty" [ref=e85]':
+          - link [ref=e86] [cursor=pointer]:
+            - /url: /#event=unleashed-2026-07-25
+          - generic [ref=e88]:
+            - paragraph [ref=e89]: UNLEASHED
+            - heading "UNLEASHED by UNDR - Kinky CSD Afterparty" [level=3] [ref=e90]
+            - paragraph [ref=e91]: Sat, 25 Jul 2026 · 22:00 · INSOMNIA Berlin, Berlin
+            - paragraph [ref=e92]: UNLEASHED Kinky CSD Afterparty — keep Pride going after the parade. Techno-focused and sex-positive across two floors at INSOMNIA Berlin.
+            - generic [ref=e93]:
+              - link "Buy Tickets" [ref=e94] [cursor=pointer]:
+                - /url: https://t.rausgegangen.de/tickets/unleashed-by-undr-kinky-techno-party-5
+              - link "More Info" [ref=e95] [cursor=pointer]:
+                - /url: /#event=unleashed-2026-07-25
+        - generic [ref=e96]:
+          - link "A" [ref=e97] [cursor=pointer]:
+            - /url: https://undr.zone/media/cage/2026-07-10/flyer.png
+            - img "A" [ref=e98]
+          - link "B" [ref=e99] [cursor=pointer]:
+            - /url: https://undr.zone/media/cage/2026-07-10/flyer.webp
+            - img "B" [ref=e100]
+        - generic [ref=e101]: RAW
+        - link "Aftermovie" [ref=e103] [cursor=pointer]:
+          - /url: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+          - generic [ref=e105]: Aftermovie
+      - generic [ref=e106]:
+        - generic [ref=e107]:
+          - paragraph [ref=e108]: This night is over — but the next UNLEASHED is already on the line.
+          - paragraph [ref=e109]: "Next: 25 JUL 2026 · INSOMNIA Berlin · from 25 EUR"
+        - generic [ref=e110]:
+          - link "Get tickets for the next UNLEASHED" [ref=e111] [cursor=pointer]:
+            - /url: /buy-tickets/
+          - link "See all dates" [ref=e112] [cursor=pointer]:
+            - /url: /
+      - region "Read next" [ref=e113]:
+        - heading "Read next" [level=2] [ref=e114]
+        - generic [ref=e115]:
+          - link "08 OCT 2025 Kinky Techno Halloween Two dancefloors, endless beats and all the kinky fun you can handle — Halloween at INSOMNIA, the way Berlin does it. Read more →" [ref=e116] [cursor=pointer]:
+            - /url: /kinky-techno-halloween/
+            - figure [ref=e117]:
+              - img "Crowd on the dancefloor at UNLEASHED Kinky Techno Halloween, Insomnia Berlin" [ref=e119]
+              - generic [ref=e120]: Past night
+            - generic [ref=e121]:
+              - paragraph [ref=e122]: 08 OCT 2025
+              - heading "Kinky Techno Halloween" [level=3] [ref=e123]
+              - paragraph [ref=e124]: Two dancefloors, endless beats and all the kinky fun you can handle — Halloween at INSOMNIA, the way Berlin does it.
+              - generic [ref=e125]: Read more →
+          - link "16 SEP 2025 Best Kinky Party 2025 UNLEASHED was voted Best Kinky Party 2025 — a thank-you to the community that made it happen, and a promise for an even wilder 2026. Read more →" [ref=e126] [cursor=pointer]:
+            - /url: /best-kinky-party-2025/
+            - figure [ref=e127]:
+              - img "The engraved-glass Kinky Guide Award trophy — “Best Kinky Party 2025, UNLEASHED.BERLIN” with the umbrella-and-handcuffs logo" [ref=e129]
+              - generic [ref=e130]: Award
+            - generic [ref=e131]:
+              - paragraph [ref=e132]: 16 SEP 2025
+              - heading "Best Kinky Party 2025" [level=3] [ref=e133]
+              - paragraph [ref=e134]: UNLEASHED was voted Best Kinky Party 2025 — a thank-you to the community that made it happen, and a promise for an even wilder 2026.
+              - generic [ref=e135]: Read more →
+          - 'link "29 JUL 2025 Zug der Liebe 2025: UNLEASHED Joins the Parade Techno as demonstration: UNLEASHED joins the 10th anniversary of Zug der Liebe — dancing for fairness, compassion and equal opportunity. Read more →" [ref=e136] [cursor=pointer]':
+            - /url: /zug-der-liebe-2025-unleashed-berlin-joins-the-parade/
+            - figure [ref=e137]:
+              - img "UNLEASHED crew dancing in the street at the Zug der Liebe 2025 techno parade, Berlin" [ref=e139]
+              - generic [ref=e140]: Past night
+            - generic [ref=e141]:
+              - paragraph [ref=e142]: 29 JUL 2025
+              - 'heading "Zug der Liebe 2025: UNLEASHED Joins the Parade" [level=3] [ref=e143]'
+              - paragraph [ref=e144]: "Techno as demonstration: UNLEASHED joins the 10th anniversary of Zug der Liebe — dancing for fairness, compassion and equal opportunity."
+              - generic [ref=e145]: Read more →
+  - contentinfo [ref=e146]:
+    - generic [ref=e148]:
+      - generic [ref=e149]:
+        - generic [ref=e150]:
+          - generic [ref=e151]:
+            - generic [ref=e152]: UNLEASHED
+            - link "Instagram" [ref=e153] [cursor=pointer]:
+              - /url: https://www.instagram.com/unleashed.berlin/
+            - link "Telegram" [ref=e154] [cursor=pointer]:
+              - /url: https://t.me/unleashed_berlin
+          - generic [ref=e155]:
+            - generic [ref=e156]: UNDR
+            - link "Instagram" [ref=e157] [cursor=pointer]:
+              - /url: https://www.instagram.com/undr.zone/
+            - link "Telegram" [ref=e158] [cursor=pointer]:
+              - /url: https://t.me/undr
+        - link "UNLEASHED · by UNDR" [ref=e159] [cursor=pointer]:
+          - /url: https://undr.zone
+          - img "by UNDR" [ref=e160]
+      - region "Stay unleashed" [ref=e161]:
+        - heading "Stay unleashed" [level=2] [ref=e162]
+        - paragraph [ref=e163]: New dates, lineups and specials — straight to your inbox.
+        - generic [ref=e164]:
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: Email address
+              - textbox "Email address" [ref=e168]
+            - button "Subscribe" [ref=e169] [cursor=pointer]
+          - paragraph [ref=e170]:
+            - text: By subscribing you agree to our
+            - link "privacy policy" [ref=e171] [cursor=pointer]:
+              - /url: /privacy-policy/
+            - text: . Unsubscribe anytime.
+          - status [ref=e172]
+      - navigation "Footer" [ref=e173]:
+        - link "News" [ref=e174] [cursor=pointer]:
+          - /url: /news/
+        - link "Newsletter" [ref=e175] [cursor=pointer]:
+          - /url: /newsletter/
+        - link "Contact" [ref=e176] [cursor=pointer]:
+          - /url: /contact/
+        - link "Shop" [ref=e177] [cursor=pointer]:
+          - /url: https://shop.unleashed.berlin/
+        - link "Imprint" [ref=e178] [cursor=pointer]:
+          - /url: /imprint/
+        - link "Privacy Policy" [ref=e179] [cursor=pointer]:
+          - /url: /privacy-policy/
+        - link "Refund Policy" [ref=e180] [cursor=pointer]:
+          - /url: https://undr.zone/rueckerstattung

@@ -146,7 +146,7 @@ final class BlogShortcuts
         return match ($code) {
             'image'   => self::renderImage($parts, $block, $baseUrl, $uid),
             'gallery' => self::renderGallery($parts, $block, $baseUrl, $uid),
-            'video'   => self::renderVideo($parts, $block, $lang),
+            'video'   => self::renderVideo($parts, $block, $lang, $baseUrl),
             'button'  => self::renderButton($parts, $block, $baseUrl),
             'quote'   => self::renderQuote($parts, $block),
             'map'     => self::renderMap($parts, $block, $lang),
@@ -159,7 +159,7 @@ final class BlogShortcuts
     {
         return match ($code) {
             'image'  => (string) ($parts[2] ?? $parts[1] ?? ''),        // caption, else alt
-            'video'  => (string) ($parts[1] ?? ''),
+            'video'  => self::videoTitle($parts),
             'button' => (string) ($parts[1] ?? ''),
             'quote'  => $parts[0] . (isset($parts[1]) ? ' — ' . $parts[1] : ''),
             'map'    => (string) ($parts[0] ?? ''),
@@ -207,8 +207,15 @@ final class BlogShortcuts
         return $items === '' ? '' : '<div class="undr-gallery">' . $items . '</div>';
     }
 
-    private static function renderVideo(array $parts, bool $block, string $lang): string
+    private static function renderVideo(array $parts, bool $block, string $lang, string $baseUrl): string
     {
+        // Local file (first-party .mp4/.webm/.mov) → native <video> player with
+        // a configurable 16:9 / 9:16 ratio box and an optional reel `loop` flag.
+        $path = (string) (parse_url($parts[0], PHP_URL_PATH) ?: $parts[0]);
+        if (preg_match('~\.(mp4|webm|mov)$~i', $path)) {
+            return self::renderLocalVideo($parts, $block, $lang, $baseUrl);
+        }
+
         $id    = self::youtubeId($parts[0]);
         $title = (string) ($parts[1] ?? '');
         if ($id === '') {
@@ -234,6 +241,39 @@ final class BlogShortcuts
              . '<span class="undr-video__play" aria-hidden="true"></span>'
              . '<span class="undr-video__title">' . h($label) . '</span>'
              . '</a></div>';
+    }
+
+    /**
+     * Native player for a self-hosted clip:
+     *   [video: /media/x.mp4 | title | 16:9|9:16 | loop]
+     * Ratio and `loop` are order-agnostic after the title. Controls always
+     * (accessible sound/pause even in reel mode); `loop` adds autoplay muted
+     * loop — the reel behavior. object-fit: contain — never crop (matches the
+     * brands' flyer components).
+     */
+    private static function renderLocalVideo(array $parts, bool $block, string $lang, string $baseUrl): string
+    {
+        $src = self::absUrl($parts[0], $baseUrl);
+        if (!preg_match('~^(?:https?://|/)~i', $src)) return '';
+        $title    = self::videoTitle($parts);
+        $flags    = array_map('strtolower', array_slice($parts, 1));
+        $vertical = in_array('9:16', $flags, true);
+        $loop     = in_array('loop', $flags, true);
+
+        if (!$block) {
+            $label = $title !== '' ? $title : self::label('blog_video_play', $lang);
+            return '<a class="undr-event-link" href="' . h($src) . '">' . h($label) . '</a>';
+        }
+
+        $vAttrs = 'src="' . h($src) . '" controls preload="metadata" playsinline';
+        if ($loop) $vAttrs .= ' autoplay muted loop';
+        if ($title !== '') $vAttrs .= ' aria-label="' . h($title) . '"';
+
+        $out = '<figure class="undr-figure undr-figure--video">'
+             . '<div class="undr-video undr-video--local' . ($vertical ? ' undr-video--vertical' : '') . '">'
+             . '<video ' . $vAttrs . '></video></div>';
+        if ($title !== '') $out .= '<figcaption>' . h($title) . '</figcaption>';
+        return $out . '</figure>';
     }
 
     private static function renderButton(array $parts, bool $block, string $baseUrl): string
@@ -277,6 +317,16 @@ final class BlogShortcuts
             return rtrim($baseUrl, '/') . $url;
         }
         return $url;
+    }
+
+    /** The [video] title = first payload part after the URL that isn't a ratio/loop flag. */
+    private static function videoTitle(array $parts): string
+    {
+        foreach (array_slice($parts, 1) as $p) {
+            $flag = strtolower($p);
+            if ($flag !== '9:16' && $flag !== '16:9' && $flag !== 'loop') return $p;
+        }
+        return '';
     }
 
     /** The 11-char YouTube id from a bare id / watch / youtu.be / embed / shorts URL. */
