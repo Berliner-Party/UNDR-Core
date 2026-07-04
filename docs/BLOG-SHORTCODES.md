@@ -28,9 +28,10 @@ projections — no button labels, no raw HTML).
 [event:2026-07-10]          date only → this site's own brand
 ```
 
-Renders a deliberately terse card — the flyer full-width at its native 16:9
-(never cropped), the event name, one meta line (brand · localized date/doors ·
-venue) and two buttons:
+Renders a text-free card: the flyer at its native 16:9 (never cropped — it
+already carries name/date/venue) with the two buttons in a right-hand rail on
+desktop, stacked below on phones. (If an event has no flyer, the card falls
+back to a name + meta text header.) The buttons:
 
 - **Buy Tickets** — the event's primary ticket link. On the event's own site, if the
   brand exposes a rausgegangen widget (`primary_ticket_link()` returns a

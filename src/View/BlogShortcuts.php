@@ -383,14 +383,19 @@ final class BlogShortcuts
         $out = '<aside class="undr-event-card' . ($past ? ' undr-event-card--past' : '')
              . '" data-undr-event="' . h($id) . '" aria-label="' . h($brand . ': ' . $name) . '">';
 
-        // Flyer, always full-width 16:9 — the flyers' native format (1920×1080),
-        // so nothing is ever cropped. Own-brand flyers are mirrored locally;
-        // foreign ones hotlink the absolute UNDR media URL injected by the sync.
+        // Flyer at its native 16:9 (1920×1080 — never cropped). Own-brand flyers
+        // are mirrored locally; foreign ones hotlink the UNDR media URL injected
+        // by the sync. The flyer artwork already carries name/date/venue, so the
+        // card shows NO text next to it — just the flyer and the two buttons
+        // (the aside's aria-label + the alt text keep it accessible).
         $flyer = is_array($e['flyer'] ?? null) ? $e['flyer'] : [];
         $src   = (string) ($flyer['src'] ?? '');
-        if ($src !== '' && EventRepository::assetRenderable($src)) {
+        $hasFlyer = $src !== '' && EventRepository::assetRenderable($src);
+        if ($hasFlyer) {
             if ($baseUrl !== '') $src = EventRepository::assetAbsUrl($src, rtrim($baseUrl, '/'));
-            $img = '<img src="' . h($src) . '" alt="' . h((string) ($flyer['alt'] ?? '')) . '" loading="lazy" decoding="async">';
+            $alt = (string) ($flyer['alt'] ?? '');
+            if ($alt === '') $alt = $brand . ': ' . $name . ' — ' . $meta; // flyer text, spoken
+            $img = '<img src="' . h($src) . '" alt="' . h($alt) . '" loading="lazy" decoding="async">';
             $webp = (string) ($flyer['webp'] ?? '');
             if ($webp !== '') {
                 if ($baseUrl !== '') $webp = EventRepository::assetAbsUrl($webp, rtrim($baseUrl, '/'));
@@ -399,15 +404,16 @@ final class BlogShortcuts
             $out .= $info !== ''
                 ? '<a class="undr-event-card__media" href="' . h($info) . '"'
                     . ($own && !$past ? ' data-open-info="' . h($id) . '"' : '')
-                    . ' tabindex="-1" aria-hidden="true">' . $img . '</a>'
+                    . '>' . $img . '</a>'
                 : '<div class="undr-event-card__media">' . $img . '</div>';
         }
 
-        // Deliberately terse body: the flyer speaks, the modal has the details —
-        // one name line, one meta line (brand · date · venue), two buttons.
         $out .= '<div class="undr-event-card__body">';
-        $out .= '<h3 class="undr-event-card__name">' . h($name) . '</h3>';
-        $out .= '<p class="undr-event-card__meta">' . h($brand . ' · ' . $meta . ($venue !== '' ? ' · ' . $venue : '')) . '</p>';
+        if (!$hasFlyer) {
+            // No artwork to speak for the event — fall back to a text header.
+            $out .= '<h3 class="undr-event-card__name">' . h($name) . '</h3>';
+            $out .= '<p class="undr-event-card__meta">' . h($brand . ' · ' . $meta . ($venue !== '' ? ' · ' . $venue : '')) . '</p>';
+        }
 
         if ($past) {
             $out .= '<p class="undr-event-card__past-note">' . h(self::label('blog_event_past', $lang)) . '</p>';

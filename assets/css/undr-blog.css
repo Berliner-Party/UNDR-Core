@@ -134,11 +134,14 @@
 .undr-share button:focus-visible { outline: none; box-shadow: var(--undr-focus); }
 
 /* ---- Event card (the [event:…] blog shortcut) ----
-   Rendered by Core's BlogShortcuts inside .undr-prose. Flyer on top at its
-   native 16:9 (1920×1080 — never cropped), then a terse body: name, one
-   meta line, two buttons. Entirely token-driven, so each brand themes it
-   through its existing :root mapping. */
+   Rendered by Core's BlogShortcuts inside .undr-prose. The flyer speaks for
+   itself (name/date/venue are in the artwork), so the card is text-free:
+   flyer at its native 16:9 (1920×1080 — never cropped) with the two buttons
+   in a right-hand rail on desktop (keeps the flyer modest), stacked below on
+   narrow viewports. Token-driven; brands theme it via their :root mapping. */
 .undr-event-card {
+  display: flex;
+  flex-direction: column;
   background: var(--undr-bg-tint);
   border: 1px solid var(--undr-rule);
   border-radius: var(--undr-radius);
@@ -152,6 +155,23 @@
   width: 100%;
   aspect-ratio: 16 / 9;
   background: var(--undr-surface-1);
+}
+
+@media (min-width: 640px) {
+  .undr-event-card { flex-direction: row; align-items: stretch; }
+  .undr-event-card__media { flex: 1 1 0; min-width: 0; width: auto; }
+  .undr-event-card__body {
+    flex: 0 0 auto;
+    justify-content: center; /* buttons ride vertically centered beside the flyer */
+  }
+  .undr-event-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0;
+    padding-top: 0;
+  }
+  .undr-event-card__actions .undr-event-card__btn { text-align: center; white-space: nowrap; }
+  .undr-event-card__past-note { margin-top: 0; } /* centered in the rail, not bottom-pinned */
 }
 .undr-event-card__media picture {
   /* the <picture> wrapper must carry the stretch or img's height:100%
@@ -173,6 +193,7 @@
   display: flex;
   flex-direction: column;
   gap: .45rem;
+  min-width: 0;
 }
 .undr-event-card__body > * { margin: 0; } /* opt out of .undr-prose rhythm */
 
