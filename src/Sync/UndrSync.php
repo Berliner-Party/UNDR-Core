@@ -100,7 +100,10 @@ final class UndrSync
     private function run(SyncResult $r): void
     {
         $state  = $this->loadState();
-        $primed = $this->haveAllSnapshots(); // only short-circuit when the cache is complete
+        // Only short-circuit when the cache is complete. The linked-events pass
+        // (cross-brand [event:…] refs in blog posts) must have run at least once
+        // too, so the first run after upgrading Core does one full pass.
+        $primed = $this->haveAllSnapshots() && array_key_exists('linked', $state);
 
         // 0) Cheapest precheck — the global /status endpoint (one tiny request, safe to
         //    poll every minute). A conditional GET 304s when nothing changed anywhere:
@@ -115,13 +118,20 @@ final class UndrSync
             $this->warnIfStale($state, $r);
             return;
         }
+        $statusBrands = [];
         if ($st->ok()) {
             $s = json_decode($st->body, true);
             if (is_array($s)) {
-                $statusLM   = $st->lastModified ?? $statusLM;
-                $newBrandLM = $s['brands'][$this->brand] ?? null;
+                $statusLM     = $st->lastModified ?? $statusLM;
+                $statusBrands = is_array($s['brands'] ?? null) ? $s['brands'] : [];
+                $newBrandLM   = $statusBrands[$this->brand] ?? null;
                 if ($primed && $newBrandLM !== null && $newBrandLM === $brandLM) {
-                    $this->persistStatus($state, $statusLM, $brandLM); // only other brands moved
+                    // Only other brands moved — but one of them may be an event
+                    // a blog post links to; refresh the linked-events cache then.
+                    if ($this->linkedNeedsSync($state, $statusBrands)) {
+                        $state['linked'] = $this->syncLinkedEvents($state, $r, $statusBrands);
+                    }
+                    $this->persistStatus($state, $statusLM, $brandLM);
                     $r->source = 'not-modified';
                     return;
                 }
@@ -213,6 +223,10 @@ final class UndrSync
             $anyWritten = true;
         }
 
+        // 3b) Cross-brand [event:…] refs in the synced posts → linked-events
+        //     cache (+ the brand registry the cards link through).
+        $linkedState = $this->syncLinkedEvents($state, $r, $statusBrands);
+
         // 4) Persist manifest + state (snapshots already durably written above).
         $this->writeRawAtomic($this->cacheDir . '/manifest.json', $res->body);
         $this->writeJsonAtomic($this->cacheDir . '/state.json', [
@@ -227,6 +241,7 @@ final class UndrSync
             'fingerprints'         => $newFingerprints,
             'langEtags'            => $langEtags,
             'assets'               => $assetState,
+            'linked'               => $linkedState,
         ]);
 
         $r->source = $anyWritten ? 'api' : ($r->degraded ? ($this->haveAnySnapshot() ? 'cache' : 'none') : 'not-modified');
@@ -387,6 +402,144 @@ final class UndrSync
     }
 
     // -----------------------------------------------------------------------
+    // Linked events — cross-brand [event:…] blog shortcuts
+    // -----------------------------------------------------------------------
+    // Blog posts may embed [event:<brand>-<date>] shortcuts pointing at ANOTHER
+    // brand's event (a CAGE card inside an UNLEASHED post). Those events are not
+    // in this brand's snapshot, so the sync resolves them here: scan the synced
+    // posts for foreign refs, mirror the brand registry (GET /brands →
+    // brands.json) and each referenced event (GET /brands/<b>/events/<date>
+    // → linked-events.<lang>.json, id-keyed). Etag-cached per event+lang,
+    // atomic writes, last-good kept on failure — same rules as the snapshots.
+    // Flyers of linked events keep their absolute UNDR media URLs (hotlink).
+
+    /**
+     * Cheap dirty-check for the "own brand unchanged" fast path: true when a
+     * referenced foreign brand moved (per /status lastModified) or a linked
+     * cache file is missing while refs exist.
+     */
+    private function linkedNeedsSync(array $state, array $statusBrands): bool
+    {
+        $linked = $state['linked'] ?? null;
+        if (!is_array($linked)) return true; // pass never ran
+        $brands = is_array($linked['brands'] ?? null) ? $linked['brands'] : [];
+        if ($brands === []) return false;    // no foreign refs recorded
+        foreach ($this->languages as $lang) {
+            if (!is_file($this->linkedPath($lang))) return true;
+        }
+        foreach ($brands as $b) {
+            $lm = $statusBrands[$b] ?? null;
+            if ($lm !== null && $lm !== ($linked['brandLM'][$b] ?? null)) return true;
+        }
+        return false;
+    }
+
+    /** Sync brands.json + linked-events.<lang>.json; returns the new state slice. */
+    private function syncLinkedEvents(array $state, SyncResult $r, array $statusBrands): array
+    {
+        $prev  = is_array($state['linked'] ?? null) ? $state['linked'] : [];
+        $etags = is_array($prev['etags'] ?? null) ? $prev['etags'] : [];
+        $refs  = $this->collectLinkedRefs();
+
+        $linked = [
+            'brands'     => array_keys($refs),
+            'brandLM'    => [],
+            'etags'      => [],
+            'brandsEtag' => $prev['brandsEtag'] ?? null,
+        ];
+
+        // Brand registry — the cards need the foreign site's URL/name/languages.
+        // Only fetched while posts actually reference a foreign event.
+        if ($refs !== []) {
+            $bRes = $this->http->get($this->apiBase . '/brands', ['etag' => $linked['brandsEtag']]);
+            if ($bRes->ok() && is_array(json_decode($bRes->body, true))) {
+                $this->writeRawAtomic($this->cacheDir . '/brands.json', $bRes->body);
+                $linked['brandsEtag'] = $bRes->etag;
+            } elseif (!$bRes->notModified()) {
+                $r->addError('linked', 'brands status=' . $bRes->status); // keep last-good brands.json
+            }
+        }
+        $registry = [];
+        foreach ((array) ($this->readLocalJson($this->cacheDir . '/brands.json') ?? []) as $b) {
+            if (is_array($b) && !empty($b['slug'])) $registry[$b['slug']] = $b;
+        }
+
+        foreach ($this->languages as $lang) {
+            $old = $this->readLocalJson($this->linkedPath($lang)) ?? [];
+            $out = [];
+            foreach ($refs as $brand => $dates) {
+                $meta = $registry[$brand] ?? [];
+                foreach ($dates as $date) {
+                    $id   = $brand . '-' . $date;
+                    $key  = $lang . '|' . $id;
+                    $cond = isset($old[$id], $etags[$key]) ? ['etag' => $etags[$key]] : [];
+                    $res  = $this->http->get($this->linkedEventUrl($brand, $date, $lang), $cond);
+
+                    if ($res->notModified()) {
+                        $out[$id] = $old[$id];
+                        $linked['etags'][$key] = $etags[$key];
+                        continue;
+                    }
+                    if ($res->status === 404) continue; // unpublished/deleted → drop
+                    $e = $res->ok() ? json_decode($res->body, true) : null;
+                    if (!is_array($e) || empty($e['id']) || empty($e['date']) || empty($e['name'])) {
+                        if (isset($old[$id])) $out[$id] = $old[$id]; // keep last-good
+                        $r->addError('linked', "event[$id,$lang] status=" . $res->status);
+                        continue;
+                    }
+                    $e['_brand'] = $brand;
+                    if (!empty($meta['name']))      $e['_brandName'] = $meta['name'];
+                    if (!empty($meta['website']))   $e['_website']   = $meta['website'];
+                    if (!empty($meta['languages'])) $e['_languages'] = $meta['languages'];
+                    $out[$id] = $e;
+                    if ($res->etag) $linked['etags'][$key] = $res->etag;
+                    $r->linkedWritten++;
+                }
+            }
+            $this->writeJsonAtomic($this->linkedPath($lang), (object) $out); // id-keyed map, {} when empty
+        }
+
+        foreach (array_keys($refs) as $b) { // remember each brand's LM for the dirty check
+            $linked['brandLM'][$b] = $statusBrands[$b] ?? ($prev['brandLM'][$b] ?? null);
+        }
+        return $linked;
+    }
+
+    /**
+     * Scan the synced blog snapshots for [event:…] refs to OTHER brands.
+     * @return array<string,string[]> brand slug → list of dates
+     */
+    private function collectLinkedRefs(): array
+    {
+        $refs = [];
+        foreach ($this->languages as $lang) {
+            $posts = $this->readLocalJson($this->blogSnapshotPath($lang));
+            foreach (is_array($posts) ? $posts : [] as $p) {
+                if (!is_array($p)) continue;
+                $text = (string) ($p['bodyMarkdown'] ?? '') . "\n" . (string) ($p['bodyHtml'] ?? '');
+                if (!preg_match_all('~\[event:\s*([a-z0-9][a-z0-9-]{0,80})\s*\]~i', $text, $m)) continue;
+                foreach ($m[1] as $ref) {
+                    // date-only refs are own-brand; full ids of the own brand
+                    // are already in the events snapshot — only foreign ones sync.
+                    if (!preg_match('/^(.+)-(\d{4}-\d{2}-\d{2})$/', strtolower($ref), $mm)) continue;
+                    if ($mm[1] === $this->brand) continue;
+                    $refs[$mm[1]][$mm[2]] = true;
+                }
+            }
+        }
+        ksort($refs);
+        return array_map(fn(array $dates) => array_keys($dates), $refs);
+    }
+
+    private function readLocalJson(string $file): ?array
+    {
+        if (!is_file($file)) return null;
+        $raw = @file_get_contents($file);
+        $data = $raw === false ? null : json_decode($raw, true);
+        return is_array($data) ? $data : null;
+    }
+
+    // -----------------------------------------------------------------------
     // Manifest helpers
     // -----------------------------------------------------------------------
     private function fingerprint(array $manifest, string $lang): string
@@ -540,4 +693,10 @@ final class UndrSync
     }
     private function snapshotPath(string $lang): string { return $this->cacheDir . '/events.' . $lang . '.json'; }
     private function blogSnapshotPath(string $lang): string { return $this->cacheDir . '/blog.' . $lang . '.json'; }
+    private function linkedPath(string $lang): string { return $this->cacheDir . '/linked-events.' . $lang . '.json'; }
+    private function linkedEventUrl(string $brand, string $date, string $lang): string
+    {
+        return $this->apiBase . '/brands/' . rawurlencode($brand) . '/events/' . rawurlencode($date)
+             . '?lang=' . rawurlencode($lang);
+    }
 }

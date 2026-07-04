@@ -14,8 +14,10 @@ src/Sync/      UndrSync, SyncResult, Cli   — pull UNDR API → local cache (by
 src/Http/      UndrHttp, UndrResponse      — dependency-free conditional GET client
 src/View/      Catalog, EventRepository, EventDerive — i18n + event loading + small derivations
 src/Site.php   Site::configure([...])      — per-site paths/brand bootstrap
-functions/     html/i18n/dates/events      — global-function shims (h(), t(), load_events(), …),
-                                             function_exists-guarded so templates need no rewrite
+functions/     html/i18n/dates/events/blog — global-function shims (h(), t(), load_events(),
+                                             blog_render_body(), …), function_exists-guarded
+                                             so templates need no rewrite; blog_render_body()
+                                             expands [event:…] shortcuts into event cards
 assets/css/    undr-base.css               — shared structure + canonical --undr-* token contract
 assets/js/     undr-modal.js, undr-tickets.js — event + tickets modal cores with onOpen/onClose hooks
 scaffold/      publish.php                 — copy assets/ → a site's public/assets/

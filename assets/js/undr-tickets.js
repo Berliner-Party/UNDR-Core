@@ -151,6 +151,9 @@
   document.addEventListener('click', (e) => {
     const trigger = e.target.closest('[data-open-tickets]');
     if (!trigger) return;
+    // No widget to load (and none loaded yet): a linking trigger (blog event
+    // card) falls back to navigating its href — the ticket page itself.
+    if (!trigger.dataset.ticketsLoader && !loadedSrc && trigger.closest('a[href]')) return;
     e.preventDefault();
     applyHeader(trigger);
     applyAlts(trigger);

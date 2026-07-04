@@ -2,16 +2,19 @@
 declare(strict_types=1);
 
 use Undr\Core\View\BlogRepository;
+use Undr\Core\View\BlogShortcuts;
 
 // ---------------------------------------------------------------------------
 // Global blog-helper shims → delegate to BlogRepository. function_exists-guarded
 // so a site keeps any brand-local override. Posts are served pre-rendered: each
-// carries a sanitized `bodyHtml` (output it directly) and its source
-// `bodyMarkdown`. Sites need no Markdown parser.
+// carries a sanitized `bodyHtml` and its source `bodyMarkdown`. Sites need no
+// Markdown parser — output the body via blog_render_body(), which also expands
+// the [event:…] shortcuts into event cards (see BlogShortcuts).
 //
 //   $posts = load_blog_posts($lang);          // newest-first, all published
 //   $posts = load_blog_posts($lang, 3);       // newest 3 (e.g. a homepage rail)
 //   $post  = load_blog_post($slug, $lang);    // one post, or null
+//   echo blog_render_body($post);             // bodyHtml + expanded shortcuts
 //   $ld    = build_blog_jsonld($post, $lang, 'https://brand.tld');
 //   $bc    = build_blog_breadcrumb($lang, 'https://brand.tld', $post);
 //   $idx   = build_blog_index_jsonld($posts, $lang, 'https://brand.tld');
@@ -34,6 +37,35 @@ if (!function_exists('load_blog_post')) {
     function load_blog_post(string $slug, string $lang): ?array
     {
         return BlogRepository::find($slug, $lang);
+    }
+}
+
+if (!function_exists('blog_render_body')) {
+    /**
+     * The post body ready to echo: the synced, sanitized bodyHtml with every
+     * [event:…] shortcut expanded into an event card (flyer + info + Buy
+     * Tickets + More Info, deep-linking across brand sites in the current
+     * language). This replaces echoing $post['bodyHtml'] directly.
+     */
+    function blog_render_body(array $post, ?string $lang = null): string
+    {
+        return blog_expand_shortcuts((string) ($post['bodyHtml'] ?? ''), $lang);
+    }
+}
+
+if (!function_exists('blog_expand_shortcuts')) {
+    /** Expand [event:…] tokens in a bodyHtml string. $baseUrl absolutizes own-site URLs (RSS). */
+    function blog_expand_shortcuts(string $html, ?string $lang = null, string $baseUrl = ''): string
+    {
+        return BlogShortcuts::expand($html, $lang, $baseUrl);
+    }
+}
+
+if (!function_exists('blog_strip_shortcuts')) {
+    /** Replace [event:…] tokens with a plain-text mention (for text projections). */
+    function blog_strip_shortcuts(string $html, ?string $lang = null): string
+    {
+        return BlogShortcuts::strip($html, $lang);
     }
 }
 
@@ -97,7 +129,8 @@ if (!function_exists('build_blog_jsonld')) {
         // answer engines quote the post directly, and a SpeakableSpecification
         // marks the headline/description for voice surfaces. Derived from the
         // sanitized bodyHtml so it stays byte-consistent with what's rendered.
-        $plain = blog_plain_text((string) ($p['bodyHtml'] ?? ''));
+        // [event:…] shortcuts become a plain-text mention (no button labels).
+        $plain = blog_plain_text(blog_strip_shortcuts((string) ($p['bodyHtml'] ?? ''), $lang));
         if ($plain !== '') {
             $out['articleBody'] = $plain;
             $out['wordCount']   = blog_word_count($plain);
@@ -276,7 +309,9 @@ if (!function_exists('build_blog_feed')) {
             $link = $base . $prefix . '/' . $slug . '/';
             $pub  = blog_rfc822((string) ($p['date'] ?? ''));
             $excerpt = blog_plain_text((string) ($p['excerpt'] ?? ''));
-            $body    = (string) ($p['bodyHtml'] ?? '');
+            // Expand [event:…] shortcuts with $base so card links/flyers stay
+            // absolute inside feed readers.
+            $body    = blog_expand_shortcuts((string) ($p['bodyHtml'] ?? ''), $lang, $base);
 
             $items .= "    <item>\n";
             $items .= '      <title>' . $x((string) $p['title']) . "</title>\n";

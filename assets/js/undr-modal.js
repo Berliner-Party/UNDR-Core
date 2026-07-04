@@ -85,6 +85,12 @@
   }
 
   // ---- Event content source -------------------------------------------------
+  function hasEvent(eventId) {
+    return SOURCE === 'data-src'
+      ? !!document.querySelector('[data-event-src="' + eventId + '"] .event-detail')
+      : !!document.getElementById('event-tpl-' + eventId);
+  }
+
   function cloneEvent(eventId) {
     if (SOURCE === 'data-src') {
       const src = document.querySelector('[data-event-src="' + eventId + '"] .event-detail');
@@ -158,6 +164,10 @@
   document.addEventListener('click', (e) => {
     const trigger = e.target.closest('[data-open-info]');
     if (!trigger) return;
+    // A linking trigger (blog event card) on a page without this event's
+    // content falls back to normal navigation — its href deep-links to
+    // /#event=<id> on the event's own page, which opens the modal on arrival.
+    if (!hasEvent(trigger.dataset.openInfo) && trigger.closest('a[href]')) return;
     e.preventDefault();
     if (ARIA_EXPANDED) { lastTrigger = trigger; trigger.setAttribute('aria-expanded', 'true'); }
     open(trigger.dataset.openInfo);

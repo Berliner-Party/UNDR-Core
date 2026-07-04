@@ -13,6 +13,7 @@ final class SyncResult
     public int    $eventsWritten = 0;
     public int    $postsWritten  = 0;       // blog posts written across languages this run
     public int    $assetsMirrored= 0;
+    public int    $linkedWritten = 0;       // cross-brand linked events fetched this run
     public array  $errors        = [];      // [['kind'=>'network|http|json|schema','msg'=>...], ...]
     public int    $exitCode      = 0;       // 0 = ok / ok-degraded, 1 = hard module fault
     public string $startedAt     = '';
@@ -34,6 +35,7 @@ final class SyncResult
             'events=' . $this->eventsWritten,
             'posts=' . $this->postsWritten,
             'assets=' . $this->assetsMirrored,
+            'linked=' . $this->linkedWritten,
             'ms=' . (int) $this->durationMs,
         ];
         if ($this->errors) {
