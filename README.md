@@ -17,7 +17,10 @@ src/Site.php   Site::configure([...])      — per-site paths/brand bootstrap
 functions/     html/i18n/dates/events/blog — global-function shims (h(), t(), load_events(),
                                              blog_render_body(), …), function_exists-guarded
                                              so templates need no rewrite; blog_render_body()
-                                             expands [event:…] shortcuts into event cards
+                                             expands the blog shortcodes ([event:…] cards,
+                                             [image]/[gallery]+lightbox, [video] facade,
+                                             [button]/[quote]/[map], raw [html]) — see
+                                             docs/BLOG-SHORTCODES.md
 assets/css/    undr-base.css               — shared structure + canonical --undr-* token contract
 assets/js/     undr-modal.js, undr-tickets.js — event + tickets modal cores with onOpen/onClose hooks
 scaffold/      publish.php                 — copy assets/ → a site's public/assets/

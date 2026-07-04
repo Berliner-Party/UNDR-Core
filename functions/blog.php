@@ -43,29 +43,38 @@ if (!function_exists('load_blog_post')) {
 if (!function_exists('blog_render_body')) {
     /**
      * The post body ready to echo: the synced, sanitized bodyHtml with every
-     * [event:…] shortcut expanded into an event card (flyer + info + Buy
-     * Tickets + More Info, deep-linking across brand sites in the current
-     * language). This replaces echoing $post['bodyHtml'] directly.
+     * shortcode expanded — [event:…] cards, [image]/[gallery] figures,
+     * [video] facades, [button]/[quote]/[map] blocks and [html]…[/html] raw
+     * blocks (whose payloads come from bodyMarkdown). This replaces echoing
+     * $post['bodyHtml'] directly. See docs/BLOG-SHORTCODES.md.
      */
     function blog_render_body(array $post, ?string $lang = null): string
     {
-        return blog_expand_shortcuts((string) ($post['bodyHtml'] ?? ''), $lang);
+        return blog_expand_shortcuts(
+            (string) ($post['bodyHtml'] ?? ''),
+            $lang,
+            '',
+            ['markdown' => (string) ($post['bodyMarkdown'] ?? '')]
+        );
     }
 }
 
 if (!function_exists('blog_expand_shortcuts')) {
-    /** Expand [event:…] tokens in a bodyHtml string. $baseUrl absolutizes own-site URLs (RSS). */
-    function blog_expand_shortcuts(string $html, ?string $lang = null, string $baseUrl = ''): string
+    /**
+     * Expand shortcodes in a bodyHtml string. $baseUrl absolutizes own-site
+     * URLs (RSS). $opts['markdown'] supplies bodyMarkdown for [html] blocks.
+     */
+    function blog_expand_shortcuts(string $html, ?string $lang = null, string $baseUrl = '', array $opts = []): string
     {
-        return BlogShortcuts::expand($html, $lang, $baseUrl);
+        return BlogShortcuts::expand($html, $lang, $baseUrl, $opts);
     }
 }
 
 if (!function_exists('blog_strip_shortcuts')) {
-    /** Replace [event:…] tokens with a plain-text mention (for text projections). */
-    function blog_strip_shortcuts(string $html, ?string $lang = null): string
+    /** Replace shortcodes with plain-text projections (for text/JSON-LD contexts). */
+    function blog_strip_shortcuts(string $html, ?string $lang = null, array $opts = []): string
     {
-        return BlogShortcuts::strip($html, $lang);
+        return BlogShortcuts::strip($html, $lang, $opts);
     }
 }
 
@@ -129,7 +138,7 @@ if (!function_exists('build_blog_jsonld')) {
         // answer engines quote the post directly, and a SpeakableSpecification
         // marks the headline/description for voice surfaces. Derived from the
         // sanitized bodyHtml so it stays byte-consistent with what's rendered.
-        // [event:…] shortcuts become a plain-text mention (no button labels).
+        // Shortcodes become plain-text mentions (no button labels, no raw HTML).
         $plain = blog_plain_text(blog_strip_shortcuts((string) ($p['bodyHtml'] ?? ''), $lang));
         if ($plain !== '') {
             $out['articleBody'] = $plain;
@@ -309,9 +318,10 @@ if (!function_exists('build_blog_feed')) {
             $link = $base . $prefix . '/' . $slug . '/';
             $pub  = blog_rfc822((string) ($p['date'] ?? ''));
             $excerpt = blog_plain_text((string) ($p['excerpt'] ?? ''));
-            // Expand [event:…] shortcuts with $base so card links/flyers stay
-            // absolute inside feed readers.
-            $body    = blog_expand_shortcuts((string) ($p['bodyHtml'] ?? ''), $lang, $base);
+            // Expand shortcodes with $base so links/images stay absolute inside
+            // feed readers; bodyMarkdown feeds the [html] blocks.
+            $body    = blog_expand_shortcuts((string) ($p['bodyHtml'] ?? ''), $lang, $base,
+                ['markdown' => (string) ($p['bodyMarkdown'] ?? '')]);
 
             $items .= "    <item>\n";
             $items .= '      <title>' . $x((string) $p['title']) . "</title>\n";

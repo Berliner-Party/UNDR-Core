@@ -177,57 +177,40 @@ Current brand configs:
 
 A brand with no tickets modal (no `#tickets-modal`) simply doesn't load `undr-tickets.js` — it's a no-op.
 
-### Blog event cards — the `[event:…]` shortcut
+### Blog shortcodes ([event:…], [image], [gallery], [video], [html], …)
 
-A blog post (authored in the UNDR portal) may embed an event shortcut **on its own
-line** of the post Markdown:
+Blog posts (authored in the UNDR portal) may embed shortcodes in their Markdown;
+Core expands them at render time. **Full authoring + behavior reference:
+[`BLOG-SHORTCODES.md`](BLOG-SHORTCODES.md).** What a site must provide:
 
-```
-[event:cage-2026-07-10]     ← any brand's event id (<brand>-<YYYY-MM-DD>)
-[event:2026-07-10]          ← date only → this site's own brand
-```
+- The post template outputs the body via the helper (not raw `bodyHtml`):
 
-At render time Core expands it into an event card — flyer, brand kicker, name,
-localized date/doors/venue, short description, **Buy Tickets** + **More Info**
-buttons. Inline occurrences (mid-sentence) become a plain text link; an
-unresolvable id renders **nothing** (never a raw token). For this to happen the
-post template must output the body through the helper instead of echoing raw
-`bodyHtml`:
+  ```php
+  <?= blog_render_body($post) ?>      <!-- was: <?= $post['bodyHtml'] ?> -->
+  ```
 
-```php
-<?= blog_render_body($post) ?>      <!-- was: <?= $post['bodyHtml'] ?> -->
-```
+  `build_blog_jsonld()` (articleBody) and `build_blog_feed()` handle shortcodes
+  automatically — no further template changes.
+- Post pages link `undr-blog.css` and load `undr-blog.js` (they carry the
+  shortcode components: event card, figure/gallery + lightbox, video facade,
+  CTA/quote/map).
+- **Tickets modal on event cards:** the card's Buy-Tickets button opens the
+  shared tickets modal only when (a) the brand's `primary_ticket_link($e)`
+  returns the rausgegangen loader under `widget`/`loader` (HEAT + UNLEASHED
+  already derive it) AND (b) the **post page includes the §6 tickets-modal
+  markup + `undr-modal.js`/`undr-tickets.js`/`window.UNDR_MODAL`**. Without
+  either, the button gracefully links the ticket shop instead. More-Info deep
+  links (`/#event=<id>`, cross-brand + language-aware) need nothing from the page.
+- **CSP:** cross-brand flyers + body images hotlink `https://undr.zone` →
+  `img-src` must allow it; the `[video]` facade swaps in a
+  `https://www.youtube-nocookie.com` iframe on click → `frame-src` must allow it.
 
-`build_blog_jsonld()` (articleBody) and `build_blog_feed()` handle the tokens
-automatically — no further template changes.
-
-**How the buttons resolve:**
-
-- **More Info** links `<site><langPrefix>/#event=<id>` — the existing hash
-  deep-link that `undr-modal.js` opens on arrival. On the event's own site the
-  href is relative (`/de/#event=…`) and carries `data-open-info`, so pages that
-  embed the event templates open the modal in place; blog pages (no templates)
-  fall back to navigation. A **cross-brand** card (a CAGE event inside an
-  UNLEASHED post) links straight to the other brand's site, keeping the current
-  page's language when that site speaks it.
-- **Buy Tickets** links the primary ticket URL (new tab). If the brand's
-  `primary_ticket_link($e)` returns a `loader` key (the rausgegangen
-  `external-loader.js` URL), the button instead carries the full
-  `[data-open-tickets]` contract from §6 and opens the shared **tickets modal**,
-  href as no-JS fallback. Cross-brand cards always link out directly.
-- Past events render an informational card (greyed flyer, "This event has taken
-  place.") with no buttons.
-
-**Cross-brand data.** The sync scans synced posts for foreign `[event:…]` refs
-and mirrors what the cards need: `GET /api/v1/brands` → `.cache/undr/brands.json`
-and each referenced event → `.cache/undr/linked-events.<lang>.json` (id-keyed,
-with `_brand`/`_brandName`/`_website`/`_languages` injected). Etag-cached,
-atomic, last-good on failure; it re-syncs when `/status` shows the referenced
-brand moved. Foreign flyers are **hotlinked** from `https://undr.zone/media/…` —
-a strict-CSP brand must allow `img-src https://undr.zone`.
-
-**Labels** default to en/de built-ins and are overridable per brand via the lang
-catalog keys `blog_event_tickets`, `blog_event_more_info`, `blog_event_past`.
+**Cross-brand event data.** The sync scans synced posts for foreign `[event:…]`
+refs and mirrors what the cards need: `GET /api/v1/brands` →
+`.cache/undr/brands.json` and each referenced event →
+`.cache/undr/linked-events.<lang>.json` (id-keyed, with
+`_brand`/`_brandName`/`_website`/`_languages` injected). Etag-cached, atomic,
+last-good on failure; re-syncs when `/status` shows the referenced brand moved.
 
 ---
 

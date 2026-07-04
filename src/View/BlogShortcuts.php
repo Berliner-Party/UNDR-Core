@@ -6,28 +6,38 @@ namespace Undr\Core\View;
 use Undr\Core\Site;
 
 // ---------------------------------------------------------------------------
-// Blog shortcuts — expand [event:<id>] tokens in a post's sanitized bodyHtml
-// into event cards at render time. Authors write, on its own line in the post
-// Markdown:
+// Blog shortcodes — expand bracket tokens in a post's sanitized bodyHtml into
+// rich blocks at render time. Authors write them in the post Markdown; the
+// backend's escape-first renderer passes them through as literal text (no
+// autolinking, brackets untouched), so expansion happens here, against the
+// local sync cache — no request-time HTTP, cache-first like everything else.
+// Full authoring reference: docs/BLOG-SHORTCODES.md.
 //
-//   [event:cage-2026-07-10]        (any brand's event id: <brand>-<YYYY-MM-DD>)
-//   [event:2026-07-10]             (date only → the current site's brand)
+//   [event:cage-2026-07-10]                       event card (see below)
+//   [image: <url> | <alt> | <caption>]            responsive figure (+lightbox)
+//   [gallery: <url> :: <alt> | <url> :: <alt>]    thumb grid (+lightbox)
+//   [video: <youtube url or id> | <title>]        GDPR click-to-load facade
+//   [button: <url> | <label>]                     CTA button
+//   [quote: <text> | <attribution>]               styled pull-quote
+//   [map: <address or venue> | <label>]           Google-Maps link-out
+//   [html] …raw markup… [/html]                   trusted raw-HTML escape hatch
 //
-// The token survives the backend's Markdown render as literal text inside a
-// <p>, so expansion happens here, against the local sync cache — no request-
-// time HTTP, cache-first like everything else:
+// Rules shared by all codes: a token filling a whole paragraph renders its
+// block form; inline occurrences render a text/link fallback (a block inside
+// <p> would be invalid HTML). A payload can never contain "](" (the backend's
+// Markdown link regex would eat it). Payloads are strip_tag'd and entity-
+// decoded before parsing, so `&`→`&amp;` in URLs and stray inline tags are
+// harmless. An unresolvable/empty token renders NOTHING — never leak raw
+// [tokens] to readers. [html] payloads are read from bodyMarkdown (the
+// sanitizer escapes them in bodyHtml but the source keeps them verbatim);
+// authors are trusted (the portal is first-party).
 //
+// The EVENT card resolves against the sync cache:
 //   own-brand events   ← .cache/undr/events.<lang>.json      (existing sync)
 //   other brands       ← .cache/undr/linked-events.<lang>.json (written by the
 //                        sync when posts reference foreign events)
 //   brand registry     ← .cache/undr/brands.json              (slug → website,
 //                        name, languages; from GET /api/v1/brands)
-//
-// A token whose event can't be resolved renders as NOTHING (the codebase's
-// graceful-degradation rule: never leak raw [event:…] to readers).
-//
-// The card: flyer, brand kicker, name, localized date/doors/venue line, short
-// description, a Buy-Tickets button and a More-Info button.
 //
 //   More info  → <a href="<site><langPrefix>/#event=<id>">. For the current
 //     brand the href is site-relative and the anchor also carries
@@ -36,17 +46,18 @@ use Undr\Core\Site;
 //     navigate and the #event= hash deep-link opens the modal on arrival —
 //     including on ANOTHER brand's site, in the current page's language.
 //   Buy tickets → the brand's primary ticket link. If the site's
-//     primary_ticket_link() returns a widget 'loader' URL (rausgegangen),
-//     the button carries the [data-open-tickets] contract and opens the shared
-//     tickets modal; otherwise (and for foreign/cross-brand events) it links
-//     the ticket page directly in a new tab.
+//     primary_ticket_link() returns a widget 'loader'/'widget' URL
+//     (rausgegangen), the button carries the [data-open-tickets] contract and
+//     opens the shared tickets modal; otherwise (and for foreign/cross-brand
+//     events) it links the ticket page directly in a new tab.
 //
-// Modes: card (post page), feed (card with absolute URLs for RSS) and text
-// (plain inline sentence, for articleBody/wordCount projections).
+// Modes: card (post page), feed (card with absolute URLs for RSS — pass
+// $baseUrl) and text (plain projections for JSON-LD articleBody/wordCount).
 // ---------------------------------------------------------------------------
 final class BlogShortcuts
 {
-    private const TOKEN = '\[event:\s*([a-z0-9][a-z0-9-]{0,80})\s*\]';
+    /** All colon-payload codes handled by the dispatch below. */
+    private const CODES = 'event|image|gallery|video|button|quote|map';
 
     /** @var array<string,mixed>|null per-request caches, keyed by lang */
     private static array $events = [];
@@ -55,44 +66,234 @@ final class BlogShortcuts
 
     // -----------------------------------------------------------------------
     /**
-     * Replace every [event:…] token in $html with an event card. A token that
-     * fills a whole paragraph becomes a block card; one inline in running text
-     * becomes a plain link (a block card inside <p> would be invalid HTML).
-     * $baseUrl absolutizes own-site URLs (pass the brand base for RSS).
+     * Replace every shortcode in $html with its rendered block. $baseUrl
+     * absolutizes own-site URLs (pass the brand base for RSS). $opts:
+     *   markdown — the post's bodyMarkdown; required for [html]…[/html]
+     *              payloads (without it those blocks render as nothing).
      */
-    public static function expand(string $html, ?string $lang = null, string $baseUrl = ''): string
+    public static function expand(string $html, ?string $lang = null, string $baseUrl = '', array $opts = []): string
     {
-        return self::replaceTokens($html, $lang ?? Catalog::lang(), $baseUrl, 'card');
+        return self::replaceTokens($html, $lang ?? Catalog::lang(), $baseUrl, 'card', (string) ($opts['markdown'] ?? ''));
     }
 
-    /** Replace tokens with a plain-text mention (JSON-LD articleBody etc.). */
-    public static function strip(string $html, ?string $lang = null): string
+    /** Replace shortcodes with plain-text projections (JSON-LD articleBody etc.). */
+    public static function strip(string $html, ?string $lang = null, array $opts = []): string
     {
-        return self::replaceTokens($html, $lang ?? Catalog::lang(), '', 'text');
+        return self::replaceTokens($html, $lang ?? Catalog::lang(), '', 'text', (string) ($opts['markdown'] ?? ''));
     }
 
-    private static function replaceTokens(string $html, string $lang, string $baseUrl, string $mode): string
+    private static function replaceTokens(string $html, string $lang, string $baseUrl, string $mode, string $markdown): string
     {
-        if ($html === '' || stripos($html, '[event:') === false) return $html;
+        if ($html === '' || strpos($html, '[') === false) return $html;
+        if (!preg_match('~\[(?:' . self::CODES . '|html)[:\]]~i', $html)) return $html;
 
-        // Pass 1: a token that IS the whole paragraph → replace the <p> itself.
+        // Pass 0: [html]…[/html] blocks. The sanitizer escaped their contents in
+        // bodyHtml, so the Nth marker pair here maps to the Nth verbatim block in
+        // bodyMarkdown. Runs first so raw payloads aren't re-scanned for codes.
+        if (stripos($html, '[html]') !== false) {
+            preg_match_all('~\[html\](.*?)\[/html\]~is', $markdown, $mm);
+            $blocks = $mm[1] ?? [];
+            $i = 0;
+            $html = (string) preg_replace_callback(
+                '~<p>\s*\[html\].*?\[/html\]\s*</p>|\[html\].*?\[/html\]~is',
+                function () use (&$i, $blocks, $mode) {
+                    $raw = trim((string) ($blocks[$i] ?? ''));
+                    $i++;
+                    return $mode === 'text' ? '' : $raw;
+                },
+                $html
+            );
+        }
+
+        $uid = 0; // per-body counter for lightbox group ids
+
+        // Pass 1: a token that IS the whole paragraph → replace the <p> itself
+        // with the code's block form.
         $html = (string) preg_replace_callback(
-            '~<p>\s*' . self::TOKEN . '\s*</p>~i',
-            fn($m) => self::renderToken($m[1], $lang, $baseUrl, $mode === 'card' ? 'card' : 'text-p'),
+            '~<p>\s*\[(' . self::CODES . '):\s*([^\]]*)\]\s*</p>~is',
+            fn($m) => self::renderCode(strtolower($m[1]), $m[2], true, $mode, $lang, $baseUrl, $uid),
             $html
         );
-        // Pass 2: inline occurrences → a link (or plain text in text mode).
+        // Pass 2: inline occurrences → text/link fallbacks.
         return (string) preg_replace_callback(
-            '~' . self::TOKEN . '~i',
-            fn($m) => self::renderToken($m[1], $lang, $baseUrl, $mode === 'card' ? 'inline' : 'text'),
+            '~\[(' . self::CODES . '):\s*([^\]]*)\]~is',
+            fn($m) => self::renderCode(strtolower($m[1]), $m[2], false, $mode, $lang, $baseUrl, $uid),
             $html
         );
     }
 
     // -----------------------------------------------------------------------
-    // Token → HTML
+    // Dispatch
     // -----------------------------------------------------------------------
-    private static function renderToken(string $ref, string $lang, string $baseUrl, string $shape): string
+    private static function renderCode(string $code, string $raw, bool $block, string $mode, string $lang, string $baseUrl, int &$uid): string
+    {
+        // Payload hygiene: drop stray inline tags (<br> across wrapped lines),
+        // undo the sanitizer's entity escaping (&amp; in URLs), then split on |.
+        $payload = trim(html_entity_decode(strip_tags($raw), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $parts   = array_values(array_filter(array_map('trim', explode('|', $payload)), fn($p) => $p !== ''));
+
+        if ($code === 'event') {
+            $shape = $mode === 'text' ? ($block ? 'text-p' : 'text') : ($block ? 'card' : 'inline');
+            return self::renderEvent($payload, $lang, $baseUrl, $shape);
+        }
+        if ($parts === []) return '';
+
+        if ($mode === 'text') {
+            $txt = self::textOf($code, $parts);
+            return $txt === '' ? '' : ($block ? '<p>' . h($txt) . '</p>' : h($txt));
+        }
+
+        return match ($code) {
+            'image'   => self::renderImage($parts, $block, $baseUrl, $uid),
+            'gallery' => self::renderGallery($parts, $block, $baseUrl, $uid),
+            'video'   => self::renderVideo($parts, $block, $lang),
+            'button'  => self::renderButton($parts, $block, $baseUrl),
+            'quote'   => self::renderQuote($parts, $block),
+            'map'     => self::renderMap($parts, $block, $lang),
+            default   => '',
+        };
+    }
+
+    /** Plain-text projection per code (articleBody / wordCount). */
+    private static function textOf(string $code, array $parts): string
+    {
+        return match ($code) {
+            'image'  => (string) ($parts[2] ?? $parts[1] ?? ''),        // caption, else alt
+            'video'  => (string) ($parts[1] ?? ''),
+            'button' => (string) ($parts[1] ?? ''),
+            'quote'  => $parts[0] . (isset($parts[1]) ? ' — ' . $parts[1] : ''),
+            'map'    => (string) ($parts[0] ?? ''),
+            default  => '',                                             // gallery
+        };
+    }
+
+    // -----------------------------------------------------------------------
+    // Simple codes
+    // -----------------------------------------------------------------------
+    private static function renderImage(array $parts, bool $block, string $baseUrl, int &$uid): string
+    {
+        $src = self::absUrl($parts[0], $baseUrl);
+        if (!preg_match('~^(?:https?://|/)~i', $src)) return '';
+        $alt     = (string) ($parts[1] ?? '');
+        $caption = (string) ($parts[2] ?? '');
+
+        if (!$block) { // inline → a plain link (a <figure> inside <p> is invalid)
+            $label = $alt !== '' ? $alt : basename(parse_url($src, PHP_URL_PATH) ?: $src);
+            return '<a class="undr-event-link" href="' . h($src) . '">' . h($label) . '</a>';
+        }
+
+        $uid++;
+        $out = '<figure class="undr-figure">'
+             . '<a href="' . h($src) . '" data-undr-lightbox="fig-' . $uid . '">'
+             . '<img src="' . h($src) . '" alt="' . h($alt) . '" loading="lazy" decoding="async">'
+             . '</a>';
+        if ($caption !== '') $out .= '<figcaption>' . h($caption) . '</figcaption>';
+        return $out . '</figure>';
+    }
+
+    private static function renderGallery(array $parts, bool $block, string $baseUrl, int &$uid): string
+    {
+        if (!$block) return ''; // gallery is block-only (documented)
+        $uid++;
+        $items = '';
+        foreach ($parts as $item) {
+            [$src, $alt] = array_pad(array_map('trim', explode('::', $item, 2)), 2, '');
+            $src = self::absUrl($src, $baseUrl);
+            if (!preg_match('~^(?:https?://|/)~i', $src)) continue;
+            $items .= '<a class="undr-gallery__item" href="' . h($src) . '" data-undr-lightbox="gal-' . $uid . '">'
+                    . '<img src="' . h($src) . '" alt="' . h($alt) . '" loading="lazy" decoding="async">'
+                    . '</a>';
+        }
+        return $items === '' ? '' : '<div class="undr-gallery">' . $items . '</div>';
+    }
+
+    private static function renderVideo(array $parts, bool $block, string $lang): string
+    {
+        $id    = self::youtubeId($parts[0]);
+        $title = (string) ($parts[1] ?? '');
+        if ($id === '') {
+            // Not a recognizable YouTube ref → degrade to a plain link (if it's a
+            // URL at all), labelled with the title.
+            if (!preg_match('~^https?://~i', $parts[0])) return '';
+            $label = $title !== '' ? $title : self::label('blog_video_play', $lang);
+            return '<a class="undr-event-link" href="' . h($parts[0]) . '" target="_blank" rel="noopener">' . h($label) . '</a>';
+        }
+
+        $watch = 'https://www.youtube.com/watch?v=' . $id;
+        $label = $title !== '' ? $title : self::label('blog_video_play', $lang);
+        if (!$block) {
+            return '<a class="undr-event-link" href="' . h($watch) . '" target="_blank" rel="noopener">' . h($label) . '</a>';
+        }
+
+        // Click-to-load facade: zero third-party requests until the visitor acts
+        // (GDPR). undr-blog.js swaps it for a youtube-nocookie <iframe>; without
+        // JS (and in feed readers) it's a plain link to YouTube.
+        return '<div class="undr-video">'
+             . '<a class="undr-video__facade" href="' . h($watch) . '" data-undr-video="' . h($id) . '"'
+             . ' data-undr-video-title="' . h($label) . '" target="_blank" rel="noopener">'
+             . '<span class="undr-video__play" aria-hidden="true"></span>'
+             . '<span class="undr-video__title">' . h($label) . '</span>'
+             . '</a></div>';
+    }
+
+    private static function renderButton(array $parts, bool $block, string $baseUrl): string
+    {
+        $url = self::absUrl($parts[0], $baseUrl);
+        if (!preg_match('~^(?:https?://|/|mailto:)~i', $url)) return '';
+        $label    = (string) ($parts[1] ?? $parts[0]);
+        $external = (bool) preg_match('~^https?://~i', $url);
+        $attrs    = 'href="' . h($url) . '"' . ($external ? ' target="_blank" rel="noopener"' : '');
+
+        if (!$block) return '<a class="undr-event-link" ' . $attrs . '>' . h($label) . '</a>';
+        return '<p class="undr-cta"><a class="undr-cta__btn" ' . $attrs . '>' . h($label) . '</a></p>';
+    }
+
+    private static function renderQuote(array $parts, bool $block): string
+    {
+        $text = $parts[0];
+        $cite = (string) ($parts[1] ?? '');
+        if (!$block) return h('“' . $text . '”' . ($cite !== '' ? ' — ' . $cite : ''));
+        $out = '<blockquote class="undr-quote"><p>' . h($text) . '</p>';
+        if ($cite !== '') $out .= '<cite>' . h($cite) . '</cite>';
+        return $out . '</blockquote>';
+    }
+
+    private static function renderMap(array $parts, bool $block, string $lang): string
+    {
+        $query = $parts[0];
+        $url   = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($query);
+        $label = (string) ($parts[1] ?? '');
+        if ($label === '') $label = self::label('blog_map_open', $lang);
+        $a = '<a class="' . ($block ? 'undr-map__link' : 'undr-event-link')
+           . '" href="' . h($url) . '" target="_blank" rel="noopener">'
+           . h($label . ' — ' . $query) . '</a>';
+        return $block ? '<p class="undr-map">' . $a . '</p>' : $a;
+    }
+
+    /** Root-relative URL → absolute when a feed base is set; else passthrough. */
+    private static function absUrl(string $url, string $baseUrl): string
+    {
+        if ($baseUrl !== '' && $url !== '' && $url[0] === '/' && !str_starts_with($url, '//')) {
+            return rtrim($baseUrl, '/') . $url;
+        }
+        return $url;
+    }
+
+    /** The 11-char YouTube id from a bare id / watch / youtu.be / embed / shorts URL. */
+    private static function youtubeId(string $ref): string
+    {
+        if (preg_match('/^[A-Za-z0-9_-]{11}$/', $ref)) return $ref;
+        if (!preg_match('~^https?://(?:www\.|m\.)?(?:youtube(?:-nocookie)?\.com|youtu\.be)/~i', $ref)) return '';
+        if (preg_match('~youtu\.be/([A-Za-z0-9_-]{11})~i', $ref, $m)) return $m[1];
+        if (preg_match('~/(?:embed|shorts|live)/([A-Za-z0-9_-]{11})~i', $ref, $m)) return $m[1];
+        if (preg_match('~[?&]v=([A-Za-z0-9_-]{11})~i', $ref, $m)) return $m[1];
+        return '';
+    }
+
+    // -----------------------------------------------------------------------
+    // Event card (unchanged behavior from the original [event:…] shortcut)
+    // -----------------------------------------------------------------------
+    private static function renderEvent(string $ref, string $lang, string $baseUrl, string $shape): string
     {
         $resolved = self::resolve(strtolower($ref), $lang);
         if ($resolved === null) return ''; // unresolvable → render nothing
@@ -116,10 +317,10 @@ final class BlogShortcuts
                 : h($label);
         }
 
-        return self::renderCard($e, $own, $lang, $baseUrl, $name, $meta, $venue, $info);
+        return self::renderEventCard($e, $own, $lang, $baseUrl, $name, $meta, $venue, $info);
     }
 
-    private static function renderCard(
+    private static function renderEventCard(
         array $e, bool $own, string $lang, string $baseUrl,
         string $name, string $meta, string $venue, string $info
     ): string {
@@ -196,8 +397,8 @@ final class BlogShortcuts
                . '" target="_blank" rel="noopener"';
 
         // Widget path (own brand only): primary_ticket_link() exposing a
-        // 'loader' (rausgegangen external-loader.js URL) → shared tickets modal,
-        // with the plain href as the no-JS / no-modal fallback.
+        // 'loader'/'widget' (rausgegangen external-loader.js URL) → shared
+        // tickets modal, with the plain href as the no-JS / no-modal fallback.
         $loader = $own ? (string) ($primary['loader'] ?? $primary['widget'] ?? '') : '';
         if ($loader !== '') {
             $dt = EventDerive::eventDt($e, 'doorsOpen', self::tz($e));
@@ -215,7 +416,7 @@ final class BlogShortcuts
     }
 
     // -----------------------------------------------------------------------
-    // Resolution
+    // Event resolution
     // -----------------------------------------------------------------------
     /** @return array{0: array, 1: bool}|null [event, isOwnBrand] or null */
     private static function resolve(string $ref, string $lang): ?array
@@ -295,7 +496,7 @@ final class BlogShortcuts
     }
 
     // -----------------------------------------------------------------------
-    // Derived bits
+    // Event derived bits
     // -----------------------------------------------------------------------
     /**
      * More-info deep link: <site><langPrefix>/#event=<id>. Own brand →
@@ -365,9 +566,9 @@ final class BlogShortcuts
     }
 
     /**
-     * Card label: the site catalog's key wins when defined (t() falls back to
+     * UI label: the site catalog's key wins when defined (t() falls back to
      * the key itself when missing), else a built-in en/de default — so the
-     * cards work with zero per-site config but stay brand-overridable.
+     * blocks work with zero per-site config but stay brand-overridable.
      */
     private static function label(string $key, string $lang): string
     {
@@ -377,6 +578,8 @@ final class BlogShortcuts
             'blog_event_tickets'   => ['en' => 'Buy Tickets', 'de' => 'Tickets kaufen'],
             'blog_event_more_info' => ['en' => 'More Info',   'de' => 'Mehr Infos'],
             'blog_event_past'      => ['en' => 'This event has taken place.', 'de' => 'Dieses Event hat bereits stattgefunden.'],
+            'blog_video_play'      => ['en' => 'Play video',  'de' => 'Video abspielen'],
+            'blog_map_open'        => ['en' => 'Open map',    'de' => 'Karte öffnen'],
         ];
         return $defaults[$key][$lang] ?? $defaults[$key]['en'] ?? $key;
     }
