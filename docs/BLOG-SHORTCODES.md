@@ -28,8 +28,9 @@ projections — no button labels, no raw HTML).
 [event:2026-07-10]          date only → this site's own brand
 ```
 
-Renders a card with flyer, brand kicker, name, localized date/doors/venue line, short
-description and two buttons:
+Renders a deliberately terse card — the flyer full-width at its native 16:9
+(never cropped), the event name, one meta line (brand · localized date/doors ·
+venue) and two buttons:
 
 - **Buy Tickets** — the event's primary ticket link. On the event's own site, if the
   brand exposes a rausgegangen widget (`primary_ticket_link()` returns a
@@ -136,7 +137,9 @@ Everything between the markers is emitted **verbatim** on the site (taken from t
 post's Markdown source — the sanitizer never touches it). Trusted-author feature: you
 can inject anything, so treat it like editing the site itself. Remember the brand
 CSPs still apply (inline `<script>` is blocked on HEAT/CAGE; iframes need a
-`frame-src` entry). Stripped entirely from JSON-LD articleBody; kept in the RSS feed.
+`frame-src` entry; **CAGE's `style-src 'self'` also strips inline `style="…"`
+attributes** — on CAGE use plain markup or the site's existing classes, not inline
+styles). Stripped entirely from JSON-LD articleBody; kept in the RSS feed.
 
 ## Label overrides (per brand, optional)
 

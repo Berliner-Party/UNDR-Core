@@ -92,8 +92,15 @@
 .undr-prose h2 { font-family: var(--undr-font-display); font-size: var(--undr-fs-xl); line-height: 1.2; color: var(--undr-ink); margin-top: 1.8em; }
 .undr-prose h3 { font-family: var(--undr-font-display); font-size: var(--undr-fs-lg); color: var(--undr-ink); margin-top: 1.5em; }
 .undr-prose h4 { font-size: var(--undr-fs-md); color: var(--undr-ink); margin-top: 1.4em; text-transform: uppercase; letter-spacing: .05em; }
-.undr-prose a { color: var(--undr-accent); text-underline-offset: .15em; transition: color var(--undr-t-fast) var(--undr-ease); }
-.undr-prose a:hover { color: var(--undr-accent-hot); }
+/* Prose links: scoped to CLASSLESS anchors so the (0,1,1) specificity never
+   outguns component anchors like .undr-cta__btn (0,1,0) — on monochrome
+   brands (CAGE: accent = white) that bug rendered buttons white-on-white.
+   The sanitizer only ever emits bare <a href> in prose, so :not([class]) is
+   exactly "author links"; shortcode inline links keep the look explicitly. */
+.undr-prose a:not([class]),
+.undr-prose .undr-event-link { color: var(--undr-accent); text-underline-offset: .15em; transition: color var(--undr-t-fast) var(--undr-ease); }
+.undr-prose a:not([class]):hover,
+.undr-prose .undr-event-link:hover { color: var(--undr-accent-hot); }
 .undr-prose strong { color: var(--undr-ink); }
 .undr-prose ul, .undr-prose ol { padding-left: 1.4em; }
 .undr-prose li + li { margin-top: .35em; }
@@ -127,23 +134,29 @@
 .undr-share button:focus-visible { outline: none; box-shadow: var(--undr-focus); }
 
 /* ---- Event card (the [event:…] blog shortcut) ----
-   Rendered by Core's BlogShortcuts inside .undr-prose. Flyer on the left,
-   info + actions on the right; stacks on narrow viewports. Entirely token-
-   driven, so each brand themes it through its existing :root mapping. */
+   Rendered by Core's BlogShortcuts inside .undr-prose. Flyer on top at its
+   native 16:9 (1920×1080 — never cropped), then a terse body: name, one
+   meta line, two buttons. Entirely token-driven, so each brand themes it
+   through its existing :root mapping. */
 .undr-event-card {
-  display: flex;
   background: var(--undr-bg-tint);
   border: 1px solid var(--undr-rule);
   border-radius: var(--undr-radius);
   overflow: hidden;
   margin: 1.6em 0;
+  clear: both; /* never wrap around a floated vertical video */
 }
 
 .undr-event-card__media {
-  flex: 0 0 38%;
-  min-width: 0;
   display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
   background: var(--undr-surface-1);
+}
+.undr-event-card__media picture {
+  /* the <picture> wrapper must carry the stretch or img's height:100%
+     resolves against an auto-height box (flyer floats atop dead space) */
+  display: block; width: 100%; height: 100%;
 }
 .undr-event-card__media img {
   width: 100%; height: 100%; object-fit: cover; display: block;
@@ -156,22 +169,13 @@
 }
 
 .undr-event-card__body {
-  flex: 1;
-  min-width: 0;
-  padding: 1.1rem 1.2rem 1.2rem;
+  padding: 1rem 1.2rem 1.2rem;
   display: flex;
   flex-direction: column;
   gap: .45rem;
 }
 .undr-event-card__body > * { margin: 0; } /* opt out of .undr-prose rhythm */
 
-.undr-event-card__kicker {
-  font-family: var(--undr-font-mono);
-  font-size: var(--undr-fs-xs);
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--undr-accent);
-}
 .undr-event-card__name {
   font-family: var(--undr-font-display);
   font-size: var(--undr-fs-lg);
@@ -185,7 +189,6 @@
   text-transform: uppercase;
   color: var(--undr-ink-faint);
 }
-.undr-event-card__desc { font-size: var(--undr-fs-sm); color: var(--undr-ink-mid); }
 .undr-event-card__past-note {
   font-family: var(--undr-font-mono);
   font-size: var(--undr-fs-xs);
@@ -201,6 +204,10 @@
   flex-wrap: wrap;
   margin-top: auto;
   padding-top: .6rem;
+}
+@media (max-width: 480px) {
+  /* Stacked buttons grow to equal full-width rows instead of ragged pills. */
+  .undr-event-card__actions .undr-event-card__btn { flex: 1 1 auto; text-align: center; }
 }
 .undr-event-card__btn {
   font-family: var(--undr-font-mono);
@@ -233,11 +240,6 @@
 }
 
 .undr-event-card--past .undr-event-card__media img { filter: grayscale(1); opacity: .7; }
-
-@media (max-width: 560px) {
-  .undr-event-card { flex-direction: column; }
-  .undr-event-card__media { flex-basis: auto; aspect-ratio: 16 / 9; }
-}
 
 /* ---- Shortcode: [image] figure ---- */
 .undr-figure { margin: 1.6em 0; }
@@ -397,6 +399,27 @@
   margin-right: auto;
 }
 
+/* On wide viewports a vertical reel floats beside the running text
+   (magazine wrap) instead of leaving empty flanks. Other shortcode blocks
+   carry `clear: both` so only paragraphs flow around it. */
+@media (min-width: 640px) {
+  .undr-figure--vertical {
+    float: right;
+    width: min(44%, 300px);
+    margin: .35em 0 1.1em 1.5em;
+  }
+  .undr-figure--vertical .undr-video--vertical { max-width: none; } /* width = float box */
+}
+.undr-figure:not(.undr-figure--vertical),
+.undr-gallery,
+.undr-video,
+.undr-cta,
+.undr-quote,
+.undr-map { clear: both; }
+.undr-figure--vertical .undr-video { clear: none; }
+/* Contain a trailing float so the article never bleeds into what follows. */
+.undr-prose::after { content: ''; display: block; clear: both; }
+
 /* ---- Shortcode: [button] CTA ---- */
 .undr-cta { margin: 1.6em 0; }
 .undr-cta__btn {
@@ -450,7 +473,7 @@
 .undr-map { margin: 1.6em 0; }
 .undr-map__link {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start; /* pin the dot to line 1 when the label wraps */
   gap: .6em;
   font-family: var(--undr-font-mono);
   font-size: var(--undr-fs-sm);
@@ -466,6 +489,7 @@
 .undr-map__link::before {            /* CSS pin dot — no image request */
   content: '';
   width: .55em; height: .55em;
+  margin-top: .42em;                 /* optically center on the first text line */
   border-radius: 50%;
   background: var(--undr-accent);
   flex: none;

@@ -269,7 +269,9 @@ final class BlogShortcuts
         if ($loop) $vAttrs .= ' autoplay muted loop';
         if ($title !== '') $vAttrs .= ' aria-label="' . h($title) . '"';
 
-        $out = '<figure class="undr-figure undr-figure--video">'
+        // Vertical reels float beside the running text on wide viewports
+        // (magazine wrap — no dead flanks); the figure carries the modifier.
+        $out = '<figure class="undr-figure undr-figure--video' . ($vertical ? ' undr-figure--vertical' : '') . '">'
              . '<div class="undr-video undr-video--local' . ($vertical ? ' undr-video--vertical' : '') . '">'
              . '<video ' . $vAttrs . '></video></div>';
         if ($title !== '') $out .= '<figcaption>' . h($title) . '</figcaption>';
@@ -381,8 +383,9 @@ final class BlogShortcuts
         $out = '<aside class="undr-event-card' . ($past ? ' undr-event-card--past' : '')
              . '" data-undr-event="' . h($id) . '" aria-label="' . h($brand . ': ' . $name) . '">';
 
-        // Flyer (own-brand flyers are mirrored locally; foreign ones hotlink the
-        // absolute UNDR media URL injected by the sync).
+        // Flyer, always full-width 16:9 — the flyers' native format (1920×1080),
+        // so nothing is ever cropped. Own-brand flyers are mirrored locally;
+        // foreign ones hotlink the absolute UNDR media URL injected by the sync.
         $flyer = is_array($e['flyer'] ?? null) ? $e['flyer'] : [];
         $src   = (string) ($flyer['src'] ?? '');
         if ($src !== '' && EventRepository::assetRenderable($src)) {
@@ -400,15 +403,11 @@ final class BlogShortcuts
                 : '<div class="undr-event-card__media">' . $img . '</div>';
         }
 
+        // Deliberately terse body: the flyer speaks, the modal has the details —
+        // one name line, one meta line (brand · date · venue), two buttons.
         $out .= '<div class="undr-event-card__body">';
-        $out .= '<p class="undr-event-card__kicker">' . h($brand) . '</p>';
         $out .= '<h3 class="undr-event-card__name">' . h($name) . '</h3>';
-        $out .= '<p class="undr-event-card__meta">' . h($meta . ($venue !== '' ? ' · ' . $venue : '')) . '</p>';
-
-        $desc = (string) ($e['shortDescription'] ?? '');
-        if ($desc !== '') {
-            $out .= '<p class="undr-event-card__desc">' . h(seo_clip($desc, 140)) . '</p>';
-        }
+        $out .= '<p class="undr-event-card__meta">' . h($brand . ' · ' . $meta . ($venue !== '' ? ' · ' . $venue : '')) . '</p>';
 
         if ($past) {
             $out .= '<p class="undr-event-card__past-note">' . h(self::label('blog_event_past', $lang)) . '</p>';
