@@ -113,7 +113,6 @@
     iframe.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1';
     iframe.title = facade.getAttribute('data-undr-video-title') || 'Video';
     iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
-    iframe.setAttribute('allowfullscreen', '');
     iframe.setAttribute('referrerpolicy', 'no-referrer');
     box.classList.add('is-playing');
     box.textContent = '';
