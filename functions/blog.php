@@ -298,7 +298,9 @@ if (!function_exists('build_blog_feed')) {
     {
         $base    = rtrim($baseUrl, '/');
         $prefix  = $lang === 'en' ? '' : '/' . $lang;
-        $self     = $base . $prefix . '/news/feed.xml';
+        // Every family site routes the feed at /feed (advertised as /feed/ in
+        // the news pages' rel=alternate) — keep the RSS self-link identical.
+        $self     = $base . $prefix . '/feed/';
         $newsUrl  = $base . $prefix . '/news/';
         $title    = $brandName . ' — News';
         $desc     = $lang === 'de' ? 'Neueste Beiträge von ' . $brandName : 'Latest posts from ' . $brandName;
