@@ -404,6 +404,7 @@ final class BlogShortcuts
             $out .= $info !== ''
                 ? '<a class="undr-event-card__media" href="' . h($info) . '"'
                     . ($own && !$past ? ' data-open-info="' . h($id) . '"' : '')
+                    . ($own ? '' : ' target="_blank" rel="noopener"')
                     . '>' . $img . '</a>'
                 : '<div class="undr-event-card__media">' . $img . '</div>';
         }
@@ -421,8 +422,9 @@ final class BlogShortcuts
             $out .= '<div class="undr-event-card__actions">';
             $out .= self::ticketsButton($e, $own, $lang);
             if ($info !== '') {
+                // Cross-brand More Info leaves this site → new tab.
                 $out .= '<a class="undr-event-card__btn" href="' . h($info) . '"'
-                      . ($own ? ' data-open-info="' . h($id) . '"' : '')
+                      . ($own ? ' data-open-info="' . h($id) . '"' : ' target="_blank" rel="noopener"')
                       . '>' . h(self::label('blog_event_more_info', $lang)) . '</a>';
             }
             $out .= '</div>';
@@ -451,10 +453,17 @@ final class BlogShortcuts
         $attrs = 'class="undr-event-card__btn undr-event-card__btn--primary" href="' . h((string) $primary['url'])
                . '" target="_blank" rel="noopener"';
 
-        // Widget path (own brand only): primary_ticket_link() exposing a
-        // 'loader'/'widget' (rausgegangen external-loader.js URL) → shared
-        // tickets modal, with the plain href as the no-JS / no-modal fallback.
+        // Widget path → shared tickets modal, plain href as the no-JS /
+        // no-modal fallback (a page without #tickets-modal never binds the
+        // trigger, so the link wins — e.g. CAGE). Own brand: the site's
+        // primary_ticket_link() may expose 'loader'/'widget'. Any brand:
+        // a rausgegangen link derives its external-loader.js here, so
+        // cross-brand cards open the modal too.
         $loader = $own ? (string) ($primary['loader'] ?? $primary['widget'] ?? '') : '';
+        if ($loader === '' && ($primary['provider'] ?? '') === 'rausgegangen'
+            && preg_match('~rausgegangen\.de/(?:events|tickets)/([^/?#]+)~i', (string) $primary['url'], $m)) {
+            $loader = 'https://t.rausgegangen.de/tickets/' . $m[1] . '/external-loader.js';
+        }
         if ($loader !== '') {
             $dt = EventDerive::eventDt($e, 'doorsOpen', self::tz($e));
             $attrs .= ' data-open-tickets data-tickets-loader="' . h($loader) . '"'

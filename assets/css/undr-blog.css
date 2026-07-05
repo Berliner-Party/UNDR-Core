@@ -162,7 +162,9 @@
   .undr-event-card__media { flex: 1 1 0; min-width: 0; width: auto; }
   .undr-event-card__body {
     flex: 0 0 auto;
-    justify-content: center; /* buttons ride vertically centered beside the flyer */
+    min-width: 11.5rem;                        /* rail width steady across EN/DE labels */
+    justify-content: center;                   /* buttons ride centered beside the flyer */
+    border-left: 1px solid var(--undr-rule);   /* hairline sets the rail off as a panel */
   }
   .undr-event-card__actions {
     flex-direction: column;
@@ -170,7 +172,7 @@
     margin-top: 0;
     padding-top: 0;
   }
-  .undr-event-card__actions .undr-event-card__btn { text-align: center; white-space: nowrap; }
+  .undr-event-card__actions .undr-event-card__btn { white-space: nowrap; }
   .undr-event-card__past-note { margin-top: 0; } /* centered in the rail, not bottom-pinned */
 }
 .undr-event-card__media picture {
@@ -182,11 +184,13 @@
   width: 100%; height: 100%; object-fit: cover; display: block;
   /* cancel .undr-prose img rounding inside the clipped card */
   border-radius: 0;
-  transition: transform var(--undr-t-base) var(--undr-ease);
+  transition: transform var(--undr-t-base) var(--undr-ease),
+              filter var(--undr-t-base) var(--undr-ease);
 }
 @media (hover: hover) and (pointer: fine) {
-  .undr-event-card__media:hover img { transform: scale(1.04); }
+  .undr-event-card__media:hover img { transform: scale(1.02); filter: brightness(1.08); }
 }
+.undr-event-card__media:focus-visible { outline: none; box-shadow: inset var(--undr-focus); }
 
 .undr-event-card__body {
   padding: 1rem 1.2rem 1.2rem;
@@ -277,6 +281,15 @@
   color: var(--undr-ink-faint);
   margin-top: .6em;
 }
+.undr-figure figcaption::before {
+  /* editorial caption dash in the brand accent — the components' signature */
+  content: '';
+  display: inline-block;
+  width: 1.1em; height: 1px;
+  background: var(--undr-accent);
+  margin-right: .6em;
+  vertical-align: middle;
+}
 
 /* ---- Shortcode: [gallery] grid ---- */
 .undr-gallery {
@@ -313,7 +326,16 @@
   max-height: 96vh;
   overflow: visible;
 }
-.undr-lightbox::backdrop { background: rgba(0, 0, 0, .92); }
+.undr-lightbox::backdrop {
+  background: rgba(0, 0, 0, .88);
+  -webkit-backdrop-filter: blur(10px);
+          backdrop-filter: blur(10px);
+}
+.undr-lightbox[open] { animation: undr-lb-in 160ms var(--undr-ease); }
+@keyframes undr-lb-in {
+  from { opacity: 0; transform: scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
 .undr-lightbox__stage { margin: 0; }
 .undr-lightbox__stage img {
   max-width: min(92vw, 1200px);
@@ -369,17 +391,24 @@
   gap: 1rem;
   width: 100%; height: 100%;
   text-decoration: none;
-  transition: background-color var(--undr-t-fast) var(--undr-ease);
+  /* quiet atmosphere instead of a flat void — accent bloom behind the play
+     ring + a diagonal surface wash; still zero external requests */
+  background:
+    radial-gradient(45% 60% at 50% 46%, var(--undr-accent-soft), transparent 70%),
+    linear-gradient(160deg, var(--undr-surface-2), transparent 55%);
+  transition: filter var(--undr-t-base) var(--undr-ease);
 }
-.undr-video__facade:hover { background: var(--undr-bg-tint); }
+.undr-video__facade:hover { filter: brightness(1.15); }
 .undr-video__facade:focus-visible { outline: none; box-shadow: inset var(--undr-focus); }
 .undr-video__play {
   width: 64px; height: 64px;
   border: 1px solid var(--undr-rule-2);
   border-radius: 50%;
   position: relative;
-  transition: border-color var(--undr-t-fast) var(--undr-ease);
+  transition: border-color var(--undr-t-fast) var(--undr-ease),
+              transform var(--undr-t-base) var(--undr-ease);
 }
+.undr-video__facade:hover .undr-video__play { transform: scale(1.06); }
 .undr-video__play::after {           /* CSS play triangle — no image request */
   content: '';
   position: absolute;
@@ -465,12 +494,27 @@
 
 /* ---- Shortcode: [quote] pull-quote ---- */
 .undr-quote {
+  position: relative;
   margin: 1.8em 0;
-  padding: 1.2rem 1.4rem;
+  padding: 1.4rem 1.6rem 1.4rem 3.4rem;
   border-left: 2px solid var(--undr-accent);
   background: var(--undr-bg-tint);
   border-radius: var(--undr-radius);
   font-style: italic;
+  overflow: hidden;
+}
+.undr-quote::before {
+  /* oversized display quote glyph, ghosted in the brand accent */
+  content: '\201C';
+  position: absolute;
+  left: .7rem; top: .2rem;
+  font-family: var(--undr-font-display);
+  font-style: normal;
+  font-size: 3.4rem;
+  line-height: 1;
+  color: var(--undr-accent);
+  opacity: .38;
+  pointer-events: none;
 }
 .undr-quote p {
   font-family: var(--undr-font-display);
@@ -516,6 +560,7 @@
   flex: none;
 }
 .undr-map__link:hover { color: var(--undr-ink); border-color: var(--undr-accent); }
+.undr-map__link:hover::before { box-shadow: 0 0 0 3px var(--undr-accent-soft); }
 .undr-map__link:focus-visible { outline: none; box-shadow: var(--undr-focus); }
 
 /* ---- Read-next rail ---- */
@@ -530,7 +575,9 @@
   .undr-event-card__media:hover img,
   .undr-event-card__btn:active,
   .undr-gallery__item:hover img,
+  .undr-video__facade:hover .undr-video__play,
   .undr-cta__btn:active,
   .undr-share a:active,
   .undr-share button:active { transform: none; }
+  .undr-lightbox[open] { animation: none; }
 }
