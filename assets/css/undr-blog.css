@@ -99,6 +99,11 @@
    exactly "author links"; shortcode inline links keep the look explicitly. */
 .undr-prose a:not([class]),
 .undr-prose .undr-event-link { color: var(--undr-accent); text-underline-offset: .15em; transition: color var(--undr-t-fast) var(--undr-ease); }
+/* WCAG 2.5.8 target size for the inline event link (a UI control, unlike bare
+   author links which fall under the inline exception): vertical padding on an
+   inline box grows its hit rect to ≥44px without moving line layout (line
+   height is set by the font, not the padding box). */
+.undr-prose .undr-event-link { padding-block: 13px; }
 .undr-prose a:not([class]):hover,
 .undr-prose .undr-event-link:hover { color: var(--undr-accent-hot); }
 .undr-prose strong { color: var(--undr-ink); }
@@ -244,6 +249,12 @@
   border: 1px solid var(--undr-rule-2);
   border-radius: var(--undr-radius);
   padding: .55em 1em;
+  /* WCAG 2.5.8 target size: the fs-xs pill is ~33px tall on its own — grow the
+     hit rect to the 44px minimum without touching the type scale. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   text-decoration: none;
   transition: border-color var(--undr-t-fast) var(--undr-ease),
               color var(--undr-t-fast) var(--undr-ease),
@@ -547,6 +558,7 @@
   border: 1px solid var(--undr-rule-2);
   border-radius: var(--undr-radius);
   padding: .7em 1.1em;
+  min-height: 44px; /* WCAG 2.5.8 target size (was ~43px at fs-sm) */
   text-decoration: none;
   transition: border-color var(--undr-t-fast) var(--undr-ease),
               color var(--undr-t-fast) var(--undr-ease);
