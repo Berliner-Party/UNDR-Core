@@ -4,7 +4,10 @@ declare(strict_types=1);
 namespace Undr\Core\Http;
 
 // ---------------------------------------------------------------------------
-// Tiny dependency-free HTTP GET client (PHP streams). No Composer/cURL needed.
+// Tiny dependency-free HTTP GET client. Uses cURL when the extension is
+// loaded — cURL races IPv4/IPv6 connects (Happy Eyeballs), so a host with a
+// black-holed IPv6 route costs ~200ms instead of hanging into the timeout,
+// which is exactly what the PHP-streams fallback does. No Composer deps.
 // Part of the reusable UNDR sync module — brand-agnostic.
 // ---------------------------------------------------------------------------
 
@@ -60,6 +63,10 @@ final class UndrHttp
         if (!empty($conditional['etag']))         $headers[] = 'If-None-Match: ' . $conditional['etag'];
         if (!empty($conditional['lastModified'])) $headers[] = 'If-Modified-Since: ' . $conditional['lastModified'];
 
+        if (function_exists('curl_init')) {
+            return $this->viaCurl($url, $headers);
+        }
+
         $ctx = stream_context_create(['http' => [
             'method'         => 'GET',
             'header'         => implode("\r\n", $headers),
@@ -84,6 +91,36 @@ final class UndrHttp
             elseif (stripos($h, 'Last-Modified:') === 0)   $lastModified = trim(substr($h, 14));
         }
 
+        return new UndrResponse($status, $status === 304 ? '' : (string) $body, $etag, $lastModified);
+    }
+
+    /** cURL transport. Response headers are captured per block so a redirect's
+     *  ETag/Last-Modified never leaks into the final response's values. */
+    private function viaCurl(string $url, array $headers): UndrResponse
+    {
+        $etag = $lastModified = null;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_CONNECTTIMEOUT => $this->timeout,
+            CURLOPT_TIMEOUT        => $this->timeout,
+            CURLOPT_HEADERFUNCTION => function ($ch, string $line) use (&$etag, &$lastModified): int {
+                if (preg_match('~^HTTP/~i', $line))              $etag = $lastModified = null; // new block (redirect)
+                elseif (stripos($line, 'ETag:') === 0)           $etag = trim(substr($line, 5));
+                elseif (stripos($line, 'Last-Modified:') === 0)  $lastModified = trim(substr($line, 14));
+                return strlen($line);
+            },
+        ]);
+        $body = curl_exec($ch);
+        $status = $body === false ? 0 : (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+
+        if ($status === 0) {
+            return new UndrResponse(0, '', null, null); // transport failure
+        }
         return new UndrResponse($status, $status === 304 ? '' : (string) $body, $etag, $lastModified);
     }
 }
