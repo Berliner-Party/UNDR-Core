@@ -22,10 +22,19 @@ use Undr\Core\Http\UndrHttp;
 // changes. Assets (flyer/promo) are mirrored locally and only re-downloaded when
 // their content hash changes. Writes are atomic (tmp → rename) so a web request
 // never observes a half-written snapshot. Any failure keeps the last-good cache.
+//
+// Consistency: a fingerprint is only recorded once the fetched snapshot carries
+// exactly the published ids the manifest lists (the API regenerates its
+// published cache a few seconds after the manifest moves — see snapshotLag()).
+// A degraded run leaves the /status timestamps untouched so the next tick
+// retries instead of 304-ing past the gap.
 // ---------------------------------------------------------------------------
 
 final class UndrSync
 {
+    /** Bump when state.json semantics change; older state forces one full pass. */
+    private const STATE_SCHEMA = 2;
+
     private string $apiBase;
     private string $brand;
     /** @var string[] */ private array $languages;
@@ -100,10 +109,11 @@ final class UndrSync
     private function run(SyncResult $r): void
     {
         $state  = $this->loadState();
-        // Only short-circuit when the cache is complete. The linked-events pass
-        // (cross-brand [event:…] refs in blog posts) must have run at least once
-        // too, so the first run after upgrading Core does one full pass.
-        $primed = $this->haveAllSnapshots() && array_key_exists('linked', $state);
+        // Only short-circuit when the cache is complete AND was written by this
+        // state schema: older state recorded fingerprints without the manifest ⇄
+        // snapshot check (and with a fingerprint blind to unpublishing), so the
+        // first run after upgrading Core does one full, verified pass.
+        $primed = $this->haveAllSnapshots() && ($state['schemaVersion'] ?? 0) === self::STATE_SCHEMA;
 
         // 0) Cheapest precheck — the global /status endpoint (one tiny request, safe to
         //    poll every minute). A conditional GET 304s when nothing changed anywhere:
@@ -146,20 +156,31 @@ final class UndrSync
             'lastModified' => $state['manifestLastModified'] ?? null,
         ] : []);
 
+        // A 304 proves the manifest we hold is current — NOT that the snapshots
+        // are. A previous run may have ended degraded (snapshot fetch failed, or
+        // the snapshot lagged the manifest after a publish race), in which case
+        // the missing content must be retried now, with the same manifest. So
+        // never return here: re-verify every language against the cached
+        // manifest below. A consistent language costs nothing (its fingerprint
+        // matches → no request), so the steady state is still a single 304.
+        $manifest = null;
         if ($primed && $res->notModified()) {
-            $this->persistStatus($state, $statusLM, $brandLM);
-            $r->source = 'not-modified';
-            $this->warnIfStale($state, $r);
-            return; // nothing changed server-side
+            $manifest = json_decode((string) $this->readLocalRaw($this->cacheDir . '/manifest.json'), true);
+            if (!$this->validManifest($manifest)) { // cache lost/corrupt → plain refetch
+                $manifest = null;
+                $res = $this->http->get($this->manifestUrl());
+            }
         }
-        if (!$res->ok()) {
-            $r->degraded = true;
-            $r->source   = $this->haveAnySnapshot() ? 'cache' : 'none';
-            $r->addError($res->transportError() ? 'network' : 'http', 'manifest status=' . $res->status);
-            return; // keep last-good cache
+        $manifestFresh = $manifest === null; // fetched this run (vs. reused from cache)
+        if ($manifestFresh) {
+            if (!$res->ok()) {
+                $r->degraded = true;
+                $r->source   = $this->haveAnySnapshot() ? 'cache' : 'none';
+                $r->addError($res->transportError() ? 'network' : 'http', 'manifest status=' . $res->status);
+                return; // keep last-good cache
+            }
+            $manifest = json_decode($res->body, true);
         }
-
-        $manifest = json_decode($res->body, true);
         if (!$this->validManifest($manifest)) {
             $r->degraded = true;
             $r->source   = $this->haveAnySnapshot() ? 'cache' : 'none';
@@ -193,7 +214,24 @@ final class UndrSync
             }
 
             $snRes = $this->http->get($this->snapshotUrl($lang), ['etag' => $langEtags[$lang] ?? null]);
-            if ($snRes->notModified()) { $newFingerprints[$lang] = $fp; continue; }
+            if ($snRes->notModified()) {
+                // The snapshot on disk is byte-identical to what the API serves —
+                // but a 304 right after a publish can mean the API's published
+                // cache simply hasn't caught up with the manifest yet.
+                $lag = $haveSnapshot ? $this->snapshotLag(
+                    $manifest,
+                    $this->readLocalJson($this->snapshotPath($lang)) ?? [],
+                    $this->readLocalJson($this->blogSnapshotPath($lang)) ?? []
+                ) : 'snapshot missing';
+                if ($lag !== null) {
+                    $r->degraded = true;
+                    $r->addError('lag', "snapshot[$lang] lags manifest: $lag");
+                    unset($langEtags[$lang]); // next tick fetches unconditionally
+                    continue;                 // fingerprint stays unrecorded → retried
+                }
+                $newFingerprints[$lang] = $fp;
+                continue;
+            }
             if (!$snRes->ok()) {
                 $r->degraded = true;
                 $r->addError($snRes->transportError() ? 'network' : 'http', "snapshot[$lang] status=" . $snRes->status);
@@ -203,6 +241,18 @@ final class UndrSync
             if (!is_array($snap) || !$this->validEvents($snap['events'] ?? null) || !$this->validBlogPosts($snap['posts'] ?? null)) {
                 $r->degraded = true;
                 $r->addError('schema', "snapshot[$lang] shape invalid");
+                continue;
+            }
+            // Publish race: the manifest (built from the store) can list content
+            // the snapshot (served from the published cache, regenerated a few
+            // seconds later) does not carry yet. Recording the manifest
+            // fingerprint for such a snapshot would freeze this language until
+            // something else about the brand changes — keep the previous
+            // snapshot, record nothing, and let the next tick retry.
+            $lag = $this->snapshotLag($manifest, $snap['events'], $snap['posts']);
+            if ($lag !== null) {
+                $r->degraded = true;
+                $r->addError('lag', "snapshot[$lang] lags manifest: $lag");
                 continue;
             }
 
@@ -228,16 +278,21 @@ final class UndrSync
         $linkedState = $this->syncLinkedEvents($state, $r, $statusBrands);
 
         // 4) Persist manifest + state (snapshots already durably written above).
-        $this->writeRawAtomic($this->cacheDir . '/manifest.json', $res->body);
+        //    The /status timestamps advance only when every language ended this
+        //    run consistent: a degraded run must not let the next tick 304 on
+        //    /status and skip the retry of whatever is still missing.
+        if ($manifestFresh) {
+            $this->writeRawAtomic($this->cacheDir . '/manifest.json', $res->body);
+        }
         $this->writeJsonAtomic($this->cacheDir . '/state.json', [
-            'schemaVersion'        => 1,
+            'schemaVersion'        => self::STATE_SCHEMA,
             'lastSync'             => gmdate('c'),
             'generatedAt'          => $manifest['generatedAt'] ?? null,
             'lastModified'         => $manifest['lastModified'] ?? null,
-            'manifestEtag'         => $res->etag,
-            'manifestLastModified' => $res->lastModified,
-            'statusLastModified'   => $statusLM ?? ($state['statusLastModified'] ?? null),
-            'brandLastModified'    => $brandLM ?? ($state['brandLastModified'] ?? null),
+            'manifestEtag'         => $manifestFresh ? $res->etag : ($state['manifestEtag'] ?? null),
+            'manifestLastModified' => $manifestFresh ? $res->lastModified : ($state['manifestLastModified'] ?? null),
+            'statusLastModified'   => $r->degraded ? ($state['statusLastModified'] ?? null) : ($statusLM ?? ($state['statusLastModified'] ?? null)),
+            'brandLastModified'    => $r->degraded ? ($state['brandLastModified'] ?? null) : ($brandLM ?? ($state['brandLastModified'] ?? null)),
             'fingerprints'         => $newFingerprints,
             'langEtags'            => $langEtags,
             'assets'               => $assetState,
@@ -533,10 +588,15 @@ final class UndrSync
 
     private function readLocalJson(string $file): ?array
     {
+        $data = json_decode((string) $this->readLocalRaw($file), true);
+        return is_array($data) ? $data : null;
+    }
+
+    private function readLocalRaw(string $file): ?string
+    {
         if (!is_file($file)) return null;
         $raw = @file_get_contents($file);
-        $data = $raw === false ? null : json_decode($raw, true);
-        return is_array($data) ? $data : null;
+        return $raw === false ? null : $raw;
     }
 
     // -----------------------------------------------------------------------
@@ -551,7 +611,8 @@ final class UndrSync
         $events = $manifest['events'] ?? [];
         usort($events, fn($a, $b) => strcmp($a['id'] ?? '', $b['id'] ?? ''));
         foreach ($events as $ev) {
-            $parts[] = ($ev['id'] ?? '') . '=' . ($ev['hashes'][$lang] ?? '');
+            // include published flag: unpublishing leaves the content hash as is
+            $parts[] = ($ev['id'] ?? '') . '=' . ($ev['hashes'][$lang] ?? '') . ($ev['published'] ?? false ? ':1' : ':0');
         }
         return hash('sha256', implode('|', $parts));
     }
@@ -577,6 +638,45 @@ final class UndrSync
     private function contentFingerprint(array $manifest, string $lang): string
     {
         return hash('sha256', $this->fingerprint($manifest, $lang) . '|' . $this->blogFingerprint($manifest, $lang));
+    }
+
+    /**
+     * Manifest ⇄ snapshot consistency check. The API builds the manifest from
+     * the store but serves /snapshot from a published cache that is regenerated
+     * a few seconds after a publish — and /snapshot sends no Last-Modified, so
+     * the only way to detect a stale snapshot is by content: every published
+     * event/post id the manifest lists must be in the snapshot, and nothing
+     * else (an unpublish lags the same way). Language does not matter — the
+     * snapshot falls back to the primary language for untranslated content.
+     * Returns null when consistent, else a short description for the log.
+     */
+    private function snapshotLag(array $manifest, array $events, array $posts): ?string
+    {
+        $diff = [];
+        foreach (['events' => $events, 'posts' => $posts] as $kind => $items) {
+            $want = $this->publishedIds($manifest[$kind] ?? []);
+            $have = [];
+            foreach ($items as $it) {
+                if (is_array($it) && !empty($it['id'])) $have[] = (string) $it['id'];
+            }
+            foreach (['missing' => array_diff($want, $have), 'extra' => array_diff($have, $want)] as $what => $ids) {
+                if ($ids === []) continue;
+                $ids  = array_values(array_unique($ids));
+                $more = count($ids) > 5 ? ' +' . (count($ids) - 5) . ' more' : '';
+                $diff[] = "$kind $what " . implode(',', array_slice($ids, 0, 5)) . $more;
+            }
+        }
+        return $diff ? implode('; ', $diff) : null;
+    }
+
+    /** @return string[] ids of the manifest entries flagged published */
+    private function publishedIds(array $entries): array
+    {
+        $ids = [];
+        foreach ($entries as $e) {
+            if (is_array($e) && !empty($e['id']) && !empty($e['published'])) $ids[] = (string) $e['id'];
+        }
+        return $ids;
     }
 
     private function updatedAtById(array $manifest): array

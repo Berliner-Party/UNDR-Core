@@ -87,3 +87,9 @@ components. See `docs/token-contract.md`.
 SemVer. Sites pin `^1.0` and upgrade on their own schedule. Deploy runs
 `composer install` + the publish step (a git `post-merge` hook keeps `git pull`
 as the deploy command — see `docs/deploy.md`).
+
+## Tests
+
+Plain PHP, no framework: `php tests/test_sync.php` drives the real sync engine
+against a scripted API on `127.0.0.1` (PHP's built-in server) and replays the
+publish race, the unpublish race, snapshot outages and the Core-upgrade pass.
