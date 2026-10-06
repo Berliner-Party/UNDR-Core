@@ -105,6 +105,8 @@
     // Event id: ?id_evenement=… (current URLs) or /ticket/E123… (legacy).
     const id = (src.match(/[?&]id_evenement=(\d+)/) || src.match(/\/ticket\/E?(\d+)/i) || [])[1];
     if (id) a.dataset.id = id;
+    const o = (src.match(/[?&]o=([^&#]+)/) || [])[1]; // sales-origin tag, mirrored like the official embed
+    if (o) a.dataset.o = decodeURIComponent(o);
     slot.appendChild(a);
     if (!document.querySelector('script[src="' + WEEZ_JS + '"]')) {
       const s = document.createElement('script');

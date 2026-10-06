@@ -43,14 +43,35 @@ $on  = ['2378967' => ['superEarlyBird' => true,  'checkedAt' => $now - 60]];
 $off = ['2378967' => ['superEarlyBird' => false, 'checkedAt' => $now - 60]];
 ok('seb: on sale + fresh -> true',     RaTickets::superEarlyBird($e, $on, $now));
 ok('seb: sold out -> false',           !RaTickets::superEarlyBird($e, $off, $now));
+ok('seb: 9-day-old check still counts', RaTickets::superEarlyBird($e, ['2378967' => ['superEarlyBird' => true, 'checkedAt' => $now - 9 * 86400]], $now));
 ok('seb: stale -> false',              !RaTickets::superEarlyBird($e, ['2378967' => ['superEarlyBird' => true, 'checkedAt' => $now - RaTickets::STALE_AFTER - 1]], $now));
+ok('seb: final -> false',              !RaTickets::superEarlyBird($e, ['2378967' => ['superEarlyBird' => true, 'final' => true, 'checkedAt' => $now - 60]], $now));
 ok('seb: unknown RA event -> false',   !RaTickets::superEarlyBird($e, [], $now));
 ok('seb: no RA link -> false',         !RaTickets::superEarlyBird(['ticketLinks' => [$e['ticketLinks'][0]]], $on, $now));
+
+// schedule: 10 d until 30 d out, 5 d until 20 d out, then 3 d (capped at the marks)
+$tz  = new DateTimeZone('Europe/Berlin');
+$at  = fn(string $d) => (new DateTimeImmutable($d, $tz))->getTimestamp();
+$ev  = '2026-12-26';
+ok('next: 60 d out -> +10 d',          RaTickets::nextCheck($at('2026-10-27'), $ev) === $at('2026-11-06'));
+ok('next: 35 d out -> capped at 30 d', RaTickets::nextCheck($at('2026-11-21'), $ev) === $at('2026-11-26'));
+ok('next: 30 d out -> +5 d',           RaTickets::nextCheck($at('2026-11-26'), $ev) === $at('2026-12-01'));
+ok('next: 23 d out -> capped at 20 d', RaTickets::nextCheck($at('2026-12-03'), $ev) === $at('2026-12-06'));
+ok('next: 20 d out -> +3 d',           RaTickets::nextCheck($at('2026-12-06'), $ev) === $at('2026-12-09'));
+
+// Super Early Bird state from RA's tier list
+$st = fn(array $types) => RaTickets::superEarlyBirdState(array_map(fn($t) => ['title' => 'Super Early Bird', 'validType' => $t], $types) + [99 => ['title' => 'Early bird', 'validType' => 'VALID']]);
+ok('state: VALID -> on sale, not gone', $st(['VALID']) === ['onSale' => true, 'gone' => false]);
+ok('state: SOLDOUT -> gone',            $st(['SOLDOUT']) === ['onSale' => false, 'gone' => true]);
+ok('state: no SEB tier -> gone',        $st([]) === ['onSale' => false, 'gone' => true]);
+ok('state: not yet on sale -> waiting', $st(['UPCOMING']) === ['onSale' => false, 'gone' => false]);
 
 // --- Weezevent -----------------------------------------------------------------
 ok('weez: widget URL is the loader',   Weezevent::widget($e['ticketLinks'][0]) === $weez);
 ok('weez: de -> locale=de-DE',         str_contains((string) Weezevent::widget($e['ticketLinks'][0], 'de'), '?code=42706&locale=de-DE&'));
 ok('weez: shop URL -> null',           Weezevent::widget(['provider' => 'weezevent', 'url' => 'https://my.weezevent.com/x']) === null);
+ok('weez: params forced (set+replace)', Weezevent::widget(['provider' => 'weezevent', 'url' => $weez . '&color_primary=0032FA'], 'en', ['o' => 'bounce', 'color_primary' => 'C4168F']) === $weez . '&color_primary=C4168F&o=bounce');
+ok('weez: de + params',                Weezevent::widget($e['ticketLinks'][0], 'de', ['o' => 'x']) === str_replace('en-GB', 'de-DE', $weez) . '&o=x');
 ok('weez: other provider -> null',     Weezevent::widget(['provider' => 'ra', 'url' => $weez]) === null);
 
 echo "\n" . $pass . ' passed, ' . $fail . " failed\n";
