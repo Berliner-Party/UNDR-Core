@@ -465,10 +465,7 @@ final class BlogShortcuts
             && preg_match('~rausgegangen\.de/(?:events|tickets)/([^/?#]+)~i', (string) $primary['url'], $m)) {
             $loader = 'https://t.rausgegangen.de/tickets/' . $m[1] . '/external-loader.js';
         }
-        if ($loader === '' && ($primary['provider'] ?? '') === 'weezevent'
-            && preg_match('~^https://widget\.weezevent\.com/~i', (string) $primary['url'])) {
-            $loader = (string) $primary['url'];
-        }
+        if ($loader === '') $loader = (string) \Undr\Core\Tickets\Weezevent::widget($primary, $lang);
         if ($loader !== '') {
             $dt = EventDerive::eventDt($e, 'doorsOpen', self::tz($e));
             $attrs .= ' data-open-tickets data-tickets-loader="' . h($loader) . '"'

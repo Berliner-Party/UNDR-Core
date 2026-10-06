@@ -178,6 +178,12 @@ Current brand configs:
   `external-loader.js`) or a **Weezevent widget URL** (`https://widget.weezevent.com/…`),
   which `undr-tickets.js` embeds via Weezevent's `weez.js`. A strict-CSP brand must allow
   `https://widget.weezevent.com` in `script-src` **and** `frame-src` to use Weezevent.
+  A brand's `primary_ticket_link()` gets that loader from `\Undr\Core\Tickets\Weezevent::widget($link, current_lang())`.
+- **RA Super Early Bird rule:** `\Undr\Core\Tickets\RaTickets::refresh($cacheDir)` (called from a
+  brand's `bin/sync.php`, self-throttled to 5 min) polls RA for each upcoming event's ticket tiers into
+  `.cache/ra/tickets.json`; `RaTickets::superEarlyBird($e)` is true while RA still sells a Super Early
+  Bird tier, and a brand's `primary_ticket_link()` then returns `RaTickets::link($e)`. Stale/failed
+  status → no override. Used by UNLEASHED, HEAT and BOUNCE; CAGE always prefers RA.
 
 A brand with no tickets modal (no `#tickets-modal`) simply doesn't load `undr-tickets.js` — it's a no-op.
 
