@@ -12,6 +12,9 @@ require $root . '/src/View/EventRepository.php';
 require $root . '/src/Http/UndrHttp.php';
 require $root . '/src/Tickets/RaTickets.php';
 require $root . '/src/Tickets/Weezevent.php';
+require $root . '/src/View/Catalog.php';
+require $root . '/functions/i18n.php';
+require $root . '/functions/events.php';
 
 use Undr\Core\Tickets\RaTickets;
 use Undr\Core\Tickets\Weezevent;
@@ -73,6 +76,15 @@ ok('weez: shop URL -> null',           Weezevent::widget(['provider' => 'weezeve
 ok('weez: params forced (set+replace)', Weezevent::widget(['provider' => 'weezevent', 'url' => $weez . '&color_primary=0032FA'], 'en', ['o' => 'bounce', 'color_primary' => 'C4168F']) === $weez . '&color_primary=C4168F&o=bounce');
 ok('weez: de + params',                Weezevent::widget($e['ticketLinks'][0], 'de', ['o' => 'x']) === str_replace('en-GB', 'de-DE', $weez) . '&o=x');
 ok('weez: other provider -> null',     Weezevent::widget(['provider' => 'ra', 'url' => $weez]) === null);
+
+// --- alt_ticket_links: an embedded primary is not repeated -------------------------
+function primary_ticket_link(array $e): ?array {
+    $l = $e['ticketLinks'][0] ?? null;
+    if ($l && ($w = Weezevent::widget($l)) !== null) $l['widget'] = $w;
+    return $l;
+}
+ok('alts: embedded weezevent -> RA only', array_column(alt_ticket_links($e), 'label') === ['Resident Advisor']);
+ok('alts: plain primary still listed',    array_column(alt_ticket_links(['ticketLinks' => [['provider' => 'ra', 'url' => $ra], $e['ticketLinks'][0]]]), 'label') === ['Resident Advisor', 'Weezevent']);
 
 echo "\n" . $pass . ' passed, ' . $fail . " failed\n";
 exit($fail === 0 ? 0 : 1);

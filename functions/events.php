@@ -73,7 +73,9 @@ if (!function_exists('alt_ticket_links')) {
         $providerLabels = ['ra' => 'Resident Advisor', 'rausgegangen' => 'Rausgegangen', 'weezevent' => 'Weezevent'];
 
         $alts = [];
-        if ($primaryUrl) {
+        // A primary whose checkout is embedded (widget in the tickets modal) is
+        // not repeated as an external link — only the other shops are listed.
+        if ($primaryUrl && empty($primary['widget'])) {
             $alts[] = [
                 'label' => $providerLabels[$primary['provider'] ?? ''] ?? t('open_ticket_shop'),
                 'url'   => $primaryUrl,
