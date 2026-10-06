@@ -174,6 +174,10 @@ Current brand configs:
 - Tickets modal (optional): `#tickets-modal`, `#tickets-widget-slot`, `#tickets-alts`
   (+ `.tickets-alts__list`), triggers `[data-open-tickets]` with `data-tickets-loader`,
   `data-tickets-alts` (JSON), `data-event-name|date|venue`.
+- `data-tickets-loader` is either a vendor **script** URL (rausgegangen's
+  `external-loader.js`) or a **Weezevent widget URL** (`https://widget.weezevent.com/…`),
+  which `undr-tickets.js` embeds via Weezevent's `weez.js`. A strict-CSP brand must allow
+  `https://widget.weezevent.com` in `script-src` **and** `frame-src` to use Weezevent.
 
 A brand with no tickets modal (no `#tickets-modal`) simply doesn't load `undr-tickets.js` — it's a no-op.
 

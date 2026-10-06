@@ -79,16 +79,52 @@
     else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
   }
 
+  // Weezevent: the loader is the widget URL (widget.weezevent.com/ticket/…).
+  // Its weez.js swaps an <a class="weezevent-widget-integration"> for a
+  // self-resizing iframe and watches the DOM for new tags, so it is loaded once
+  // and each event switch just drops a fresh tag into the slot.
+  const WEEZ_JS = 'https://widget.weezevent.com/weez.js';
+
+  function isWeezevent(src) {
+    try { return new URL(src, location.href).hostname === 'widget.weezevent.com'; } catch (_) { return false; }
+  }
+
+  function loadWeezevent(src) {
+    const a = document.createElement('a');
+    a.className = 'weezevent-widget-integration';
+    a.href = src;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = 'Weezevent';
+    a.dataset.src = src;
+    a.dataset.type = 'neo';
+    a.dataset.resize = '1';
+    a.dataset.width_auto = '1';
+    a.dataset.height = '600';
+    a.dataset.useContainer = 'yes';
+    // Event id: ?id_evenement=… (current URLs) or /ticket/E123… (legacy).
+    const id = (src.match(/[?&]id_evenement=(\d+)/) || src.match(/\/ticket\/E?(\d+)/i) || [])[1];
+    if (id) a.dataset.id = id;
+    slot.appendChild(a);
+    if (!document.querySelector('script[src="' + WEEZ_JS + '"]')) {
+      const s = document.createElement('script');
+      s.src = WEEZ_JS;
+      s.async = true;
+      document.head.appendChild(s);
+    }
+  }
+
   function loadWidget(src) {
     if (!src || src === loadedSrc) return;
     slot.innerHTML = '';
+    loadedSrc = src;
+    if (isWeezevent(src)) { loadWeezevent(src); return; }
     const s = document.createElement('script');
     s.src = src;
     s.id = 'purchase-widget-loader';
     s.setAttribute('data-layout', 'fullwidth');
     s.async = true;
     slot.appendChild(s);
-    loadedSrc = src;
   }
 
   function open(src) {

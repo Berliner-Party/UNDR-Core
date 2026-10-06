@@ -457,12 +457,17 @@ final class BlogShortcuts
         // no-modal fallback (a page without #tickets-modal never binds the
         // trigger, so the link wins — e.g. CAGE). Own brand: the site's
         // primary_ticket_link() may expose 'loader'/'widget'. Any brand:
-        // a rausgegangen link derives its external-loader.js here, so
-        // cross-brand cards open the modal too.
+        // a rausgegangen link derives its external-loader.js here, and a
+        // Weezevent widget URL is its own loader, so cross-brand cards open
+        // the modal too.
         $loader = $own ? (string) ($primary['loader'] ?? $primary['widget'] ?? '') : '';
         if ($loader === '' && ($primary['provider'] ?? '') === 'rausgegangen'
             && preg_match('~rausgegangen\.de/(?:events|tickets)/([^/?#]+)~i', (string) $primary['url'], $m)) {
             $loader = 'https://t.rausgegangen.de/tickets/' . $m[1] . '/external-loader.js';
+        }
+        if ($loader === '' && ($primary['provider'] ?? '') === 'weezevent'
+            && preg_match('~^https://widget\.weezevent\.com/~i', (string) $primary['url'])) {
+            $loader = (string) $primary['url'];
         }
         if ($loader !== '') {
             $dt = EventDerive::eventDt($e, 'doorsOpen', self::tz($e));

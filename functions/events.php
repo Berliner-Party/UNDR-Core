@@ -70,7 +70,7 @@ if (!function_exists('alt_ticket_links')) {
     {
         $primary    = function_exists('primary_ticket_link') ? primary_ticket_link($e) : ($e['ticketLinks'][0] ?? null);
         $primaryUrl = $primary['url'] ?? null;
-        $providerLabels = ['ra' => 'Resident Advisor', 'rausgegangen' => 'Rausgegangen'];
+        $providerLabels = ['ra' => 'Resident Advisor', 'rausgegangen' => 'Rausgegangen', 'weezevent' => 'Weezevent'];
 
         $alts = [];
         if ($primaryUrl) {
